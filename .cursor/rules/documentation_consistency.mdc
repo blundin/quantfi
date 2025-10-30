@@ -1,0 +1,143 @@
+---
+alwaysApply: true
+---
+
+# Documentation Consistency Rule
+
+## Purpose
+Ensure all documentation maintains consistent terminology, formatting, and structure across the IBKR Client Portal Web API integration project.
+
+## Scope
+- All `.md` files in the `docs/` directory
+- README files
+- Code comments and docstrings
+- User-facing documentation
+
+## Standards
+
+### Naming Conventions
+- **Database file**: Always use `portfolio.db` (never `flex.db`)
+- **Table names**: Use `executions`, `cash_transactions`, `account_summaries` (not `trades`, `cash_flows`, `dividends`)
+- **CLI commands**: Use `python -m src.cli` format (not `ibweb`)
+- **Java version**: Always specify Java 11+ (not 8u192+)
+
+### Terminology
+- Use "Web API" (not "Flex" or "Flex Web Service")
+- Use "Client Portal Gateway" (not just "Gateway")
+- Use "macOS-local" for deployment context
+- Use "ephemeral responses" for non-persistent API data
+
+### Cross-References
+- All major docs must reference related docs in References section
+- Use consistent format: `- [Doc Name]: \`docs/filename.md\``
+- Include both internal and external references where appropriate
+
+### File Structure
+- Start with Purpose section
+- Include References section with cross-links
+- Use consistent heading hierarchy (##, ###, ####)
+- Include code examples in appropriate language blocks
+
+## Enforcement
+- Review all documentation changes for consistency
+- Update related docs when making terminology changes
+- Verify cross-references are current and accurate
+- Check that examples match current implementation
+
+## Examples
+
+### Good Documentation
+```markdown
+# Web API Integration
+
+Purpose: Integrate with IBKR Client Portal Web API via local gateway.
+
+References:
+- Authentication guide: `docs/ib_web_api_auth.md`
+- Data model: `docs/data_model.md`
+```
+
+### Bad Documentation
+```markdown
+# Flex Integration
+
+Purpose: Use Flex Web Service for data.
+
+References: (missing)
+```
+
+## Review Checklist
+- [ ] Terminology matches project standards
+- [ ] Cross-references are current
+- [ ] Code examples use correct commands
+- [ ] File names and paths are accurate
+- [ ] Version requirements are consistent# Documentation Consistency Rule
+
+## Purpose
+Ensure all documentation maintains consistent terminology, formatting, and structure across the IBKR Client Portal Web API integration project.
+
+## Scope
+- All `.md` files in the `docs/` directory
+- README files
+- Code comments and docstrings
+- User-facing documentation
+
+## Standards
+
+### Naming Conventions
+- **Database file**: Always use `portfolio.db` (never `flex.db`)
+- **Table names**: Use `executions`, `cash_transactions`, `account_summaries` (not `trades`, `cash_flows`, `dividends`)
+- **CLI commands**: Use `python -m src.cli` format (not `ibweb`)
+- **Java version**: Always specify Java 11+ (not 8u192+)
+
+### Terminology
+- Use "Web API" (not "Flex" or "Flex Web Service")
+- Use "Client Portal Gateway" (not just "Gateway")
+- Use "macOS-local" for deployment context
+- Use "ephemeral responses" for non-persistent API data
+
+### Cross-References
+- All major docs must reference related docs in References section
+- Use consistent format: `- [Doc Name]: \`docs/filename.md\``
+- Include both internal and external references where appropriate
+
+### File Structure
+- Start with Purpose section
+- Include References section with cross-links
+- Use consistent heading hierarchy (##, ###, ####)
+- Include code examples in appropriate language blocks
+
+## Enforcement
+- Review all documentation changes for consistency
+- Update related docs when making terminology changes
+- Verify cross-references are current and accurate
+- Check that examples match current implementation
+
+## Examples
+
+### Good Documentation
+```markdown
+# Web API Integration
+
+Purpose: Integrate with IBKR Client Portal Web API via local gateway.
+
+References:
+- Authentication guide: `docs/ib_web_api_auth.md`
+- Data model: `docs/data_model.md`
+```
+
+### Bad Documentation
+```markdown
+# Flex Integration
+
+Purpose: Use Flex Web Service for data.
+
+References: (missing)
+```
+
+## Review Checklist
+- [ ] Terminology matches project standards
+- [ ] Cross-references are current
+- [ ] Code examples use correct commands
+- [ ] File names and paths are accurate
+- [ ] Version requirements are consistent

@@ -1,0 +1,430 @@
+# Notebook UX Rule
+
+## Purpose
+Ensure consistent, user-friendly, and effective user experience in Jupyter notebooks for the IBKR Client Portal Web API integration.
+
+## Scope
+- Notebook interface design
+- User interaction patterns
+- Error display and feedback
+- Data visualization
+- Performance optimization
+
+## UX Design Principles
+
+### Clarity and Simplicity
+- **Clear labeling**: All buttons, inputs, and displays have descriptive labels
+- **Consistent terminology**: Use project-standard terms throughout
+- **Logical grouping**: Related controls are grouped together
+- **Progressive disclosure**: Show essential info first, details on demand
+
+### Responsive Feedback
+- **Immediate feedback**: Users know their actions are being processed
+- **Status indicators**: Clear visual indicators for system state
+- **Progress indication**: Show progress for long-running operations
+- **Error guidance**: Provide clear next steps for errors
+
+### Accessibility
+- **High contrast**: Use high-contrast colors for status indicators
+- **Keyboard navigation**: Support keyboard shortcuts where appropriate
+- **Screen reader friendly**: Use semantic HTML and proper labeling
+- **Tooltips**: Provide helpful tooltips for complex controls
+
+## Notebook Structure Standards
+
+### data_import.ipynb Layout
+```python
+# Good: Clear notebook structure
+# Cell 1: Imports and setup
+import pandas as pd
+import ipywidgets as widgets
+from IPython.display import display, HTML
+
+# Cell 2: Status panel
+status_panel = create_status_panel()
+
+# Cell 3: Control buttons
+control_buttons = create_control_buttons()
+
+# Cell 4: Live mode controls
+live_mode_controls = create_live_mode_controls()
+
+# Cell 5: Data panels
+data_panels = create_data_panels()
+```
+
+### Control Design Patterns
+```python
+# Good: Consistent control design
+def create_control_buttons():
+    """Create control buttons with consistent styling"""
+    buttons = {
+        'check_gateway': widgets.Button(
+            description='Check Gateway',
+            button_style='info',
+            icon='wifi',
+            layout=widgets.Layout(width='150px')
+        ),
+        'sync_accounts': widgets.Button(
+            description='Sync Accounts',
+            button_style='primary',
+            icon='refresh',
+            layout=widgets.Layout(width='150px')
+        ),
+        'sync_positions': widgets.Button(
+            description='Sync Positions',
+            button_style='primary',
+            icon='refresh',
+            layout=widgets.Layout(width='150px')
+        ),
+        'validate_data': widgets.Button(
+            description='Validate Data',
+            button_style='warning',
+            icon='check-circle',
+            layout=widgets.Layout(width='150px')
+        )
+    }
+    
+    # Add event handlers
+    for button in buttons.values():
+        button.on_click(handle_button_click)
+    
+    return buttons
+```
+
+## Status Display Standards
+
+### Status Panel Design
+```python
+# Good: Comprehensive status panel
+def create_status_panel():
+    """Create status panel with clear indicators"""
+    status_widgets = {
+        'gateway_status': widgets.HTML(
+            value='<div class="status-item">Gateway: <span class="status-unknown">Unknown</span></div>',
+            layout=widgets.Layout(width='300px')
+        ),
+        'session_status': widgets.HTML(
+            value='<div class="status-item">Session: <span class="status-unknown">Unknown</span></div>',
+            layout=widgets.Layout(width='300px')
+        ),
+        'last_sync': widgets.HTML(
+            value='<div class="status-item">Last Sync: <span class="status-unknown">Never</span></div>',
+            layout=widgets.Layout(width='300px')
+        ),
+        'data_health': widgets.HTML(
+            value='<div class="status-item">Data Health: <span class="status-unknown">Unknown</span></div>',
+            layout=widgets.Layout(width='300px')
+        )
+    }
+    
+    return widgets.VBox(list(status_widgets.values()))
+```
+
+### Status Indicator Styling
+```css
+/* Good: Clear status indicator styling */
+.status-ok {
+    color: #28a745;
+    font-weight: bold;
+}
+
+.status-warning {
+    color: #ffc107;
+    font-weight: bold;
+}
+
+.status-error {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.status-unknown {
+    color: #6c757d;
+    font-style: italic;
+}
+
+.status-item {
+    margin: 5px 0;
+    padding: 3px 0;
+    border-bottom: 1px solid #e9ecef;
+}
+```
+
+## Error Display Standards
+
+### Error Panel Design
+```python
+# Good: User-friendly error display
+def create_error_panel():
+    """Create error panel with clear error information"""
+    error_widgets = {
+        'error_list': widgets.HTML(
+            value='<div class="error-panel">No errors</div>',
+            layout=widgets.Layout(width='100%', height='200px')
+        ),
+        'error_actions': widgets.HBox([
+            widgets.Button(description='Clear Errors', button_style='secondary'),
+            widgets.Button(description='View Logs', button_style='info'),
+            widgets.Button(description='Retry Failed', button_style='warning')
+        ])
+    }
+    
+    return widgets.VBox(list(error_widgets.values()))
+
+def display_error(error, context=None):
+    """Display error in user-friendly format"""
+    error_html = f"""
+    <div class="error-item">
+        <div class="error-header">
+            <span class="error-type">{type(error).__name__}</span>
+            <span class="error-time">{datetime.now().strftime('%H:%M:%S')}</span>
+        </div>
+        <div class="error-message">{str(error)}</div>
+        {f'<div class="error-context">Context: {context}</div>' if context else ''}
+        <div class="error-actions">
+            <button onclick="retryOperation('{context}')">Retry</button>
+            <button onclick="dismissError('{id(error)}')">Dismiss</button>
+        </div>
+    </div>
+    """
+    
+    return error_html
+```
+
+## Data Display Standards
+
+### Table Display
+```python
+# Good: Consistent table display
+def display_positions_table(positions_df):
+    """Display positions table with consistent styling"""
+    if positions_df.empty:
+        return widgets.HTML('<div class="no-data">No positions found</div>')
+    
+    # Style the dataframe
+    styled_df = positions_df.style.format({
+        'quantity': '{:.0f}',
+        'market_price': '${:.2f}',
+        'market_value': '${:.2f}',
+        'unrealized_pnl': '${:.2f}'
+    }).apply(highlight_pnl, axis=1)
+    
+    # Add filters
+    filters = create_table_filters(positions_df)
+    
+    return widgets.VBox([
+        filters,
+        widgets.HTML(styled_df.to_html(classes='table table-striped'))
+    ])
+
+def highlight_pnl(row):
+    """Highlight P&L based on value"""
+    if row['unrealized_pnl'] > 0:
+        return ['background-color: #d4edda'] * len(row)
+    elif row['unrealized_pnl'] < 0:
+        return ['background-color: #f8d7da'] * len(row)
+    else:
+        return [''] * len(row)
+```
+
+### Chart Display
+```python
+# Good: Consistent chart display
+def create_performance_chart(account_summaries_df):
+    """Create performance chart with consistent styling"""
+    import plotly.graph_objects as go
+    
+    fig = go.Figure()
+    
+    fig.add_trace(go.Scatter(
+        x=account_summaries_df['snapshot_ts'],
+        y=account_summaries_df['net_liquidation'],
+        mode='lines+markers',
+        name='Net Liquidation',
+        line=dict(color='#007bff', width=2)
+    ))
+    
+    fig.update_layout(
+        title='Account Performance Over Time',
+        xaxis_title='Date',
+        yaxis_title='Value ($)',
+        template='plotly_white',
+        height=400
+    )
+    
+    return fig
+```
+
+## Performance Optimization
+
+### Lazy Loading
+```python
+# Good: Lazy loading for large datasets
+def create_lazy_data_panel():
+    """Create data panel with lazy loading"""
+    panel = widgets.Tab()
+    
+    # Add tabs but don't load data until clicked
+    panel.children = [
+        widgets.HTML('<div class="loading">Click to load positions</div>'),
+        widgets.HTML('<div class="loading">Click to load executions</div>'),
+        widgets.HTML('<div class="loading">Click to load cash transactions</div>')
+    ]
+    
+    panel.titles = ['Positions', 'Executions', 'Cash Transactions']
+    
+    # Load data when tab is selected
+    panel.observe(load_tab_data, names='selected_index')
+    
+    return panel
+
+def load_tab_data(change):
+    """Load data when tab is selected"""
+    if change['new'] == 0:  # Positions tab
+        load_positions_data()
+    elif change['new'] == 1:  # Executions tab
+        load_executions_data()
+    elif change['new'] == 2:  # Cash transactions tab
+        load_cash_transactions_data()
+```
+
+### Caching
+```python
+# Good: Intelligent caching
+from functools import lru_cache
+import time
+
+class DataCache:
+    def __init__(self, ttl=300):  # 5 minutes
+        self.cache = {}
+        self.ttl = ttl
+    
+    def get(self, key):
+        """Get cached data if not expired"""
+        if key in self.cache:
+            data, timestamp = self.cache[key]
+            if time.time() - timestamp < self.ttl:
+                return data
+            else:
+                del self.cache[key]
+        return None
+    
+    def set(self, key, data):
+        """Cache data with timestamp"""
+        self.cache[key] = (data, time.time())
+    
+    def clear(self):
+        """Clear all cached data"""
+        self.cache.clear()
+
+# Use cache for expensive operations
+@lru_cache(maxsize=128)
+def get_positions_data(account_id, force_refresh=False):
+    """Get positions data with caching"""
+    if force_refresh:
+        get_positions_data.cache_clear()
+    
+    return fetch_positions_from_api(account_id)
+```
+
+## User Interaction Patterns
+
+### Button States
+```python
+# Good: Clear button states
+def update_button_state(button, state):
+    """Update button state with visual feedback"""
+    if state == 'loading':
+        button.description = 'Loading...'
+        button.disabled = True
+        button.button_style = 'info'
+    elif state == 'success':
+        button.description = 'Success!'
+        button.disabled = False
+        button.button_style = 'success'
+    elif state == 'error':
+        button.description = 'Error'
+        button.disabled = False
+        button.button_style = 'danger'
+    else:  # normal
+        button.description = button.original_description
+        button.disabled = False
+        button.button_style = 'primary'
+```
+
+### Progress Indicators
+```python
+# Good: Progress indicators for long operations
+def show_progress(operation_name, total_steps):
+    """Show progress for long operations"""
+    progress = widgets.IntProgress(
+        value=0,
+        min=0,
+        max=total_steps,
+        description=operation_name,
+        bar_style='info',
+        orientation='horizontal'
+    )
+    
+    status = widgets.HTML(value='Starting...')
+    
+    progress_widget = widgets.VBox([progress, status])
+    display(progress_widget)
+    
+    return progress, status
+
+def update_progress(progress, status, step, message):
+    """Update progress indicator"""
+    progress.value = step
+    status.value = f'Step {step}: {message}'
+```
+
+## Testing UX Components
+
+### Widget Testing
+```python
+# Good: Test notebook widgets
+class TestNotebookWidgets:
+    def test_status_panel_creation(self):
+        """Test status panel creation"""
+        panel = create_status_panel()
+        assert isinstance(panel, widgets.VBox)
+        assert len(panel.children) == 4  # Four status items
+    
+    def test_button_click_handling(self):
+        """Test button click handling"""
+        button = widgets.Button(description='Test')
+        button.on_click(handle_button_click)
+        
+        # Simulate button click
+        button.click()
+        
+        # Verify handler was called
+        assert button.clicked is True
+    
+    def test_error_display(self):
+        """Test error display"""
+        error = ValueError("Test error")
+        error_html = display_error(error, "test context")
+        
+        assert "ValueError" in error_html
+        assert "Test error" in error_html
+        assert "test context" in error_html
+```
+
+## Compliance Checklist
+
+### Implementation
+- [ ] Widgets follow design standards
+- [ ] Error display is user-friendly
+- [ ] Status indicators are clear
+- [ ] Performance is optimized
+- [ ] Accessibility is considered
+
+### User Experience
+- [ ] Controls are intuitive
+- [ ] Feedback is immediate
+- [ ] Errors are actionable
+- [ ] Data is clearly presented
+- [ ] Navigation is logical

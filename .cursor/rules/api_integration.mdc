@@ -1,0 +1,377 @@
+---
+alwaysApply: true
+---
+
+# API Integration Rule
+
+## Purpose
+Ensure consistent and robust integration with the IBKR Client Portal Web API through the local gateway.
+
+## Scope
+- All API client code
+- Endpoint integrations
+- Error handling
+- Session management
+- Data normalization
+
+## API Standards
+
+### Base Configuration
+- **Base URL**: Always use `https://localhost:5000/v1/api`
+- **TLS**: Handle self-signed certificates appropriately
+- **Cookies**: Preserve session cookies between requests
+- **Headers**: Include CSRF token when required
+
+### Session Management
+```python
+# Good: Proper session handling
+class IBKRAPIClient:
+    def __init__(self):
+        self.base_url = "https://localhost:5000/v1/api"
+        self.session = requests.Session()
+        self.session.verify = False  # For self-signed certs
+    
+    def tickle(self):
+        """Keep session alive"""
+        response = self.session.get(f"{self.base_url}/tickle")
+        return response.json()
+```
+
+### Error Handling
+```python
+# Good: Comprehensive error handling
+def api_call_with_retry(self, endpoint, max_retries=5):
+    for attempt in range(max_retries):
+        try:
+            response = self.session.get(f"{self.base_url}/{endpoint}")
+            if response.status_code == 401:
+                raise AuthenticationError("Session expired")
+            elif response.status_code == 403:
+                raise AuthenticationError("Insufficient permissions")
+            elif response.status_code >= 500:
+                raise RetryableError(f"Server error: {response.status_code}")
+            return response.json()
+        except RetryableError as e:
+            if attempt == max_retries - 1:
+                raise
+            time.sleep(2 ** attempt)  # Exponential backoff
+```
+
+### Data Normalization
+```python
+# Good: Consistent data normalization
+def normalize_positions(api_response):
+    """Convert API response to standardized format"""
+    positions = []
+    for item in api_response:
+        position = {
+            'conid': item['conid'],
+            'symbol': item['symbol'],
+            'sec_type': item['secType'],
+            'quantity': float(item['position']),
+            'market_price': float(item.get('marketPrice', 0)),
+            'market_value': float(item.get('marketValue', 0)),
+            'currency': item['currency']
+        }
+        positions.append(position)
+    return positions
+```
+
+## Endpoint Standards
+
+### Required Endpoints
+- **Health**: `/v1/api/tickle`
+- **Accounts**: `/v1/api/portfolio/accounts`
+- **Positions**: `/v1/api/portfolio/{accountId}/positions`
+- **Executions**: `/v1/api/iserver/account/trades`
+- **Cash Transactions**: `/v1/api/portfolio/{accountId}/transactions`
+- **Account Summary**: `/v1/api/portfolio/{accountId}/summary`
+
+### Request Patterns
+```python
+# Good: Consistent request pattern
+def get_positions(account_id):
+    """Get current positions for account"""
+    endpoint = f"/portfolio/{account_id}/positions"
+    response = self.api_call_with_retry(endpoint)
+    return self.normalize_positions(response)
+
+# Bad: Inconsistent patterns
+def get_positions(account_id):
+    response = requests.get(f"https://localhost:5000/v1/api/portfolio/{account_id}/positions")
+    return response.json()  # No error handling
+```
+
+## Error Classification
+
+### Retryable Errors
+- Network timeouts
+- 5xx server errors
+- Rate limiting (429)
+- Temporary gateway issues
+
+### Non-Retryable Errors
+- 401/403 authentication errors
+- 400 bad request errors
+- 404 not found errors
+- Data validation errors
+
+## Validation Rules
+
+### Pre-commit Checks
+- [ ] All API calls use retry logic
+- [ ] Error handling covers all HTTP status codes
+- [ ] Session management includes tickle functionality
+- [ ] Data normalization is consistent
+- [ ] No hardcoded URLs or credentials
+
+### Code Review Requirements
+- [ ] API client follows established patterns
+- [ ] Error messages are user-friendly
+- [ ] Retry logic is appropriate
+- [ ] Data validation is comprehensive
+- [ ] Logging includes appropriate context
+
+## Testing Requirements
+
+### Unit Tests
+- Mock API responses for all endpoints
+- Test error handling scenarios
+- Validate data normalization
+- Test retry logic with different error types
+
+### Integration Tests
+- Test against mock gateway
+- Validate session management
+- Test error recovery procedures
+- Verify data consistency
+
+## Documentation Requirements
+
+### API Client Documentation
+- Document all public methods
+- Include error handling examples
+- Provide usage patterns
+- Document configuration options
+
+### Error Handling Documentation
+- List all possible error conditions
+- Provide resolution steps
+- Include troubleshooting guides
+- Document retry policies
+
+## Monitoring and Alerting
+
+### Health Checks
+- Gateway connectivity monitoring
+- Session validity checks
+- API response time monitoring
+- Error rate tracking
+
+### Alerting Thresholds
+- Gateway unavailable > 5 minutes
+- Session expiry frequency
+- API error rate > 10%
+- Response time > 30 seconds
+
+## Compliance Checklist
+
+### Implementation
+- [ ] API client follows established patterns
+- [ ] Error handling is comprehensive
+- [ ] Session management is robust
+- [ ] Data normalization is consistent
+- [ ] Testing coverage is adequate
+
+### Operations
+- [ ] Monitoring is configured
+- [ ] Alerting thresholds are set
+- [ ] Documentation is current
+- [ ] Troubleshooting guides exist
+- [ ] Performance is acceptable# API Integration Rule
+
+## Purpose
+Ensure consistent and robust integration with the IBKR Client Portal Web API through the local gateway.
+
+## Scope
+- All API client code
+- Endpoint integrations
+- Error handling
+- Session management
+- Data normalization
+
+## API Standards
+
+### Base Configuration
+- **Base URL**: Always use `https://localhost:5000/v1/api`
+- **TLS**: Handle self-signed certificates appropriately
+- **Cookies**: Preserve session cookies between requests
+- **Headers**: Include CSRF token when required
+
+### Session Management
+```python
+# Good: Proper session handling
+class IBKRAPIClient:
+    def __init__(self):
+        self.base_url = "https://localhost:5000/v1/api"
+        self.session = requests.Session()
+        self.session.verify = False  # For self-signed certs
+    
+    def tickle(self):
+        """Keep session alive"""
+        response = self.session.get(f"{self.base_url}/tickle")
+        return response.json()
+```
+
+### Error Handling
+```python
+# Good: Comprehensive error handling
+def api_call_with_retry(self, endpoint, max_retries=5):
+    for attempt in range(max_retries):
+        try:
+            response = self.session.get(f"{self.base_url}/{endpoint}")
+            if response.status_code == 401:
+                raise AuthenticationError("Session expired")
+            elif response.status_code == 403:
+                raise AuthenticationError("Insufficient permissions")
+            elif response.status_code >= 500:
+                raise RetryableError(f"Server error: {response.status_code}")
+            return response.json()
+        except RetryableError as e:
+            if attempt == max_retries - 1:
+                raise
+            time.sleep(2 ** attempt)  # Exponential backoff
+```
+
+### Data Normalization
+```python
+# Good: Consistent data normalization
+def normalize_positions(api_response):
+    """Convert API response to standardized format"""
+    positions = []
+    for item in api_response:
+        position = {
+            'conid': item['conid'],
+            'symbol': item['symbol'],
+            'sec_type': item['secType'],
+            'quantity': float(item['position']),
+            'market_price': float(item.get('marketPrice', 0)),
+            'market_value': float(item.get('marketValue', 0)),
+            'currency': item['currency']
+        }
+        positions.append(position)
+    return positions
+```
+
+## Endpoint Standards
+
+### Required Endpoints
+- **Health**: `/v1/api/tickle`
+- **Accounts**: `/v1/api/portfolio/accounts`
+- **Positions**: `/v1/api/portfolio/{accountId}/positions`
+- **Executions**: `/v1/api/iserver/account/trades`
+- **Cash Transactions**: `/v1/api/portfolio/{accountId}/transactions`
+- **Account Summary**: `/v1/api/portfolio/{accountId}/summary`
+
+### Request Patterns
+```python
+# Good: Consistent request pattern
+def get_positions(account_id):
+    """Get current positions for account"""
+    endpoint = f"/portfolio/{account_id}/positions"
+    response = self.api_call_with_retry(endpoint)
+    return self.normalize_positions(response)
+
+# Bad: Inconsistent patterns
+def get_positions(account_id):
+    response = requests.get(f"https://localhost:5000/v1/api/portfolio/{account_id}/positions")
+    return response.json()  # No error handling
+```
+
+## Error Classification
+
+### Retryable Errors
+- Network timeouts
+- 5xx server errors
+- Rate limiting (429)
+- Temporary gateway issues
+
+### Non-Retryable Errors
+- 401/403 authentication errors
+- 400 bad request errors
+- 404 not found errors
+- Data validation errors
+
+## Validation Rules
+
+### Pre-commit Checks
+- [ ] All API calls use retry logic
+- [ ] Error handling covers all HTTP status codes
+- [ ] Session management includes tickle functionality
+- [ ] Data normalization is consistent
+- [ ] No hardcoded URLs or credentials
+
+### Code Review Requirements
+- [ ] API client follows established patterns
+- [ ] Error messages are user-friendly
+- [ ] Retry logic is appropriate
+- [ ] Data validation is comprehensive
+- [ ] Logging includes appropriate context
+
+## Testing Requirements
+
+### Unit Tests
+- Mock API responses for all endpoints
+- Test error handling scenarios
+- Validate data normalization
+- Test retry logic with different error types
+
+### Integration Tests
+- Test against mock gateway
+- Validate session management
+- Test error recovery procedures
+- Verify data consistency
+
+## Documentation Requirements
+
+### API Client Documentation
+- Document all public methods
+- Include error handling examples
+- Provide usage patterns
+- Document configuration options
+
+### Error Handling Documentation
+- List all possible error conditions
+- Provide resolution steps
+- Include troubleshooting guides
+- Document retry policies
+
+## Monitoring and Alerting
+
+### Health Checks
+- Gateway connectivity monitoring
+- Session validity checks
+- API response time monitoring
+- Error rate tracking
+
+### Alerting Thresholds
+- Gateway unavailable > 5 minutes
+- Session expiry frequency
+- API error rate > 10%
+- Response time > 30 seconds
+
+## Compliance Checklist
+
+### Implementation
+- [ ] API client follows established patterns
+- [ ] Error handling is comprehensive
+- [ ] Session management is robust
+- [ ] Data normalization is consistent
+- [ ] Testing coverage is adequate
+
+### Operations
+- [ ] Monitoring is configured
+- [ ] Alerting thresholds are set
+- [ ] Documentation is current
+- [ ] Troubleshooting guides exist
+- [ ] Performance is acceptable

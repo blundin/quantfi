@@ -1,0 +1,368 @@
+# Error Handling Rule
+
+## Purpose
+Ensure robust, consistent, and user-friendly error handling throughout the IBKR Client Portal Web API integration.
+
+## Scope
+- API client error handling
+- Database operation error handling
+- Data validation error handling
+- User interface error display
+- Logging and monitoring
+
+## Error Classification
+
+### API Errors
+- **Authentication Errors (401/403)**: Session expired, insufficient permissions
+- **Network Errors**: Connection refused, timeouts, DNS issues
+- **Server Errors (5xx)**: Gateway issues, IBKR server problems
+- **Client Errors (4xx)**: Bad requests, not found, rate limiting
+
+### Data Errors
+- **Validation Errors**: Invalid data format, missing required fields
+- **Business Logic Errors**: Impossible P&L, negative positions without short flag
+- **Consistency Errors**: Balance reconciliation failures, data conflicts
+
+### System Errors
+- **Database Errors**: Connection failures, constraint violations, corruption
+- **File System Errors**: Permission issues, disk space, file not found
+- **Configuration Errors**: Missing environment variables, invalid settings
+
+## Error Handling Patterns
+
+### API Error Handling
+```python
+# Good: Comprehensive API error handling
+class IBKRAPIClient:
+    def api_call_with_retry(self, endpoint, max_retries=5):
+        """Make API call with retry logic"""
+        for attempt in range(max_retries):
+            try:
+                response = self.session.get(f"{self.base_url}/{endpoint}")
+                
+                if response.status_code == 401:
+                    raise AuthenticationError("Session expired. Please re-authenticate.")
+                elif response.status_code == 403:
+                    raise AuthenticationError("Insufficient permissions.")
+                elif response.status_code == 404:
+                    raise NotFoundError(f"Endpoint not found: {endpoint}")
+                elif response.status_code == 429:
+                    raise RateLimitError("Rate limit exceeded. Please wait.")
+                elif response.status_code >= 500:
+                    raise ServerError(f"Server error: {response.status_code}")
+                elif response.status_code >= 400:
+                    raise ClientError(f"Client error: {response.status_code}")
+                
+                return response.json()
+                
+            except requests.exceptions.ConnectionError as e:
+                if attempt == max_retries - 1:
+                    raise ConnectionError("Gateway not reachable. Start gateway and retry.")
+                time.sleep(2 ** attempt)  # Exponential backoff
+                
+            except requests.exceptions.Timeout as e:
+                if attempt == max_retries - 1:
+                    raise TimeoutError("Request timeout. Please try again.")
+                time.sleep(2 ** attempt)
+                
+            except requests.exceptions.RequestException as e:
+                raise NetworkError(f"Network error: {str(e)}")
+```
+
+### Data Validation Error Handling
+```python
+# Good: Data validation error handling
+def validate_and_normalize_positions(api_data):
+    """Validate and normalize position data"""
+    validated_positions = []
+    errors = []
+    
+    for i, item in enumerate(api_data):
+        try:
+            # Validate required fields
+            if not item.get('conid'):
+                raise ValidationError(f"Position {i}: Missing conid")
+            if not item.get('symbol'):
+                raise ValidationError(f"Position {i}: Missing symbol")
+            if item.get('position') is None:
+                raise ValidationError(f"Position {i}: Missing position quantity")
+            
+            # Validate data types and ranges
+            position_qty = float(item['position'])
+            if position_qty < 0 and not item.get('is_short', False):
+                raise ValidationError(f"Position {i}: Negative quantity without short flag")
+            
+            # Normalize data
+            normalized = {
+                'conid': int(item['conid']),
+                'symbol': str(item['symbol']).upper(),
+                'quantity': position_qty,
+                'currency': str(item.get('currency', 'USD')).upper()
+            }
+            
+            validated_positions.append(normalized)
+            
+        except ValidationError as e:
+            errors.append(f"Position {i}: {str(e)}")
+        except (ValueError, TypeError) as e:
+            errors.append(f"Position {i}: Invalid data type - {str(e)}")
+    
+    if errors:
+        raise ValidationError(f"Validation failed: {'; '.join(errors)}")
+    
+    return validated_positions
+```
+
+### Database Error Handling
+```python
+# Good: Database error handling
+def safe_database_operation(operation, *args, **kwargs):
+    """Execute database operation with error handling"""
+    try:
+        return operation(*args, **kwargs)
+    except sqlite3.IntegrityError as e:
+        if "UNIQUE constraint failed" in str(e):
+            raise DuplicateRecordError("Record already exists")
+        elif "FOREIGN KEY constraint failed" in str(e):
+            raise ReferentialIntegrityError("Referenced record not found")
+        else:
+            raise DatabaseError(f"Integrity constraint violation: {str(e)}")
+    except sqlite3.OperationalError as e:
+        if "database is locked" in str(e):
+            raise DatabaseLockedError("Database is locked. Please try again.")
+        elif "no such table" in str(e):
+            raise SchemaError("Database schema error. Please run migrations.")
+        else:
+            raise DatabaseError(f"Database operation failed: {str(e)}")
+    except sqlite3.DatabaseError as e:
+        raise DatabaseError(f"Database error: {str(e)}")
+```
+
+## Error Recovery Strategies
+
+### Automatic Recovery
+```python
+# Good: Automatic error recovery
+def sync_with_recovery(account_id, entities):
+    """Sync data with automatic error recovery"""
+    successful_entities = []
+    failed_entities = []
+    
+    for entity in entities:
+        try:
+            sync_entity(account_id, entity)
+            successful_entities.append(entity)
+        except RetryableError as e:
+            # Schedule for retry
+            schedule_retry(entity, delay=300)  # 5 minutes
+            failed_entities.append(entity)
+        except NonRetryableError as e:
+            # Log and skip
+            logger.error(f"Non-retryable error for {entity}: {str(e)}")
+            failed_entities.append(entity)
+    
+    # Update sync log
+    update_sync_log({
+        'status': 'partial' if failed_entities else 'success',
+        'successful_entities': successful_entities,
+        'failed_entities': failed_entities
+    })
+    
+    return successful_entities, failed_entities
+```
+
+### User-Initiated Recovery
+```python
+# Good: User-initiated recovery
+def handle_user_recovery_request(operation, context):
+    """Handle user-initiated recovery"""
+    try:
+        # Clear any cached state
+        clear_operation_cache(operation)
+        
+        # Reset retry counters
+        reset_retry_counters(operation)
+        
+        # Re-run operation
+        result = execute_operation(operation, context)
+        
+        # Notify user of success
+        notify_user("Operation completed successfully", "success")
+        
+        return result
+        
+    except Exception as e:
+        # Provide detailed error information
+        error_info = {
+            'operation': operation,
+            'error': str(e),
+            'context': context,
+            'suggestions': get_recovery_suggestions(e)
+        }
+        
+        notify_user(f"Recovery failed: {str(e)}", "error", error_info)
+        raise
+```
+
+## Error Display and User Experience
+
+### CLI Error Display
+```python
+# Good: User-friendly CLI error display
+def display_error(error, context=None):
+    """Display error in user-friendly format"""
+    if isinstance(error, AuthenticationError):
+        print("🔐 Authentication Error")
+        print("   Session expired. Please re-authenticate at https://localhost:5000/")
+        print("   Then retry the operation.")
+    elif isinstance(error, ConnectionError):
+        print("🌐 Connection Error")
+        print("   Gateway not reachable. Please start the gateway:")
+        print("   ./bin/run.sh root/conf.yaml")
+    elif isinstance(error, ValidationError):
+        print("⚠️  Validation Error")
+        print(f"   {str(error)}")
+        if context:
+            print(f"   Context: {context}")
+    else:
+        print("❌ Error")
+        print(f"   {str(error)}")
+        if context:
+            print(f"   Context: {context}")
+```
+
+### Notebook Error Display
+```python
+# Good: Notebook error display
+def display_notebook_error(error, cell_output=True):
+    """Display error in notebook format"""
+    error_info = {
+        'type': type(error).__name__,
+        'message': str(error),
+        'timestamp': datetime.now().isoformat(),
+        'severity': get_error_severity(error)
+    }
+    
+    if cell_output:
+        # Display in cell output
+        display_error_widget(error_info)
+    else:
+        # Add to error panel
+        add_to_error_panel(error_info)
+    
+    # Log error
+    logger.error("Notebook error", extra=error_info)
+```
+
+## Logging and Monitoring
+
+### Structured Error Logging
+```python
+# Good: Structured error logging
+def log_error(error, context=None, user_action=None):
+    """Log error with structured data"""
+    error_data = {
+        'timestamp': datetime.utcnow().isoformat(),
+        'error_type': type(error).__name__,
+        'error_message': str(error),
+        'context': context,
+        'user_action': user_action,
+        'retry_count': getattr(error, 'retry_count', 0),
+        'account_id': redact_account_id(context.get('account_id') if context else None)
+    }
+    
+    logger.error("Application error", extra=error_data)
+    
+    # Send to monitoring system if configured
+    if monitoring_enabled():
+        send_to_monitoring(error_data)
+```
+
+### Error Metrics and Alerting
+```python
+# Good: Error metrics and alerting
+class ErrorMonitor:
+    def __init__(self):
+        self.error_counts = defaultdict(int)
+        self.error_rates = defaultdict(float)
+        self.alert_thresholds = {
+            'authentication_errors': 5,  # per hour
+            'connection_errors': 10,     # per hour
+            'validation_errors': 20,     # per hour
+            'database_errors': 3         # per hour
+        }
+    
+    def record_error(self, error_type, context=None):
+        """Record error occurrence"""
+        self.error_counts[error_type] += 1
+        
+        # Check alert thresholds
+        if self.error_counts[error_type] > self.alert_thresholds.get(error_type, 0):
+            self.send_alert(error_type, context)
+    
+    def send_alert(self, error_type, context):
+        """Send alert for error threshold exceeded"""
+        alert_data = {
+            'error_type': error_type,
+            'count': self.error_counts[error_type],
+            'threshold': self.alert_thresholds[error_type],
+            'context': context,
+            'timestamp': datetime.utcnow().isoformat()
+        }
+        
+        logger.warning(f"Error threshold exceeded: {error_type}", extra=alert_data)
+        # Send to alerting system
+```
+
+## Testing Error Scenarios
+
+### Error Handling Tests
+```python
+# Good: Error handling tests
+class TestErrorHandling:
+    def test_authentication_error_handling(self, mock_gateway):
+        """Test authentication error handling"""
+        mock_gateway.set_response('/tickle', status_code=401)
+        client = IBKRAPIClient()
+        
+        with pytest.raises(AuthenticationError) as exc_info:
+            client.tickle()
+        
+        assert "Session expired" in str(exc_info.value)
+    
+    def test_retry_logic_with_server_error(self, mock_gateway):
+        """Test retry logic with server errors"""
+        mock_gateway.set_response('/positions', status_code=500)
+        client = IBKRAPIClient()
+        
+        with pytest.raises(MaxRetriesExceeded):
+            client.get_positions('U1234567')
+        
+        # Verify retry attempts were made
+        assert mock_gateway.call_count == 5  # Max retries
+    
+    def test_validation_error_handling(self):
+        """Test validation error handling"""
+        invalid_data = [{'conid': None, 'symbol': 'AAPL'}]
+        
+        with pytest.raises(ValidationError) as exc_info:
+            validate_and_normalize_positions(invalid_data)
+        
+        assert "Missing conid" in str(exc_info.value)
+```
+
+## Compliance Checklist
+
+### Implementation
+- [ ] Error classification is comprehensive
+- [ ] Retry logic is appropriate
+- [ ] Error messages are user-friendly
+- [ ] Logging includes sufficient context
+- [ ] Recovery procedures are documented
+
+### Operations
+- [ ] Error monitoring is configured
+- [ ] Alerting thresholds are set
+- [ ] Recovery procedures are tested
+- [ ] Error documentation is current
+- [ ] User guidance is clear

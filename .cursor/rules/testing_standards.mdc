@@ -1,0 +1,777 @@
+---
+alwaysApply: true
+---
+
+# Testing Standards Rule
+
+## Purpose
+Ensure comprehensive testing coverage and quality for the IBKR Client Portal Web API integration project.
+
+## Scope
+- Unit tests
+- Integration tests
+- End-to-end tests
+- Performance tests
+- Security tests
+
+## Testing Requirements
+
+### Coverage Standards
+- **Line coverage**: Minimum 90%
+- **Branch coverage**: Minimum 80%
+- **Function coverage**: 100%
+- **Critical path coverage**: 100%
+
+### Test Structure
+```
+tests/
+├── unit/
+│   ├── test_api_client.py
+│   ├── test_data_normalization.py
+│   ├── test_validation.py
+│   └── test_retry_logic.py
+├── integration/
+│   ├── test_gateway_integration.py
+│   ├── test_database_operations.py
+│   └── test_sync_workflows.py
+├── fixtures/
+│   ├── sample_responses.py
+│   ├── mock_gateway.py
+│   └── test_data.py
+└── conftest.py
+```
+
+## Unit Testing Standards
+
+### API Client Tests
+```python
+# Good: Comprehensive API client testing
+class TestIBKRAPIClient:
+    def test_tickle_success(self, mock_gateway):
+        """Test successful tickle call"""
+        mock_gateway.set_response('/tickle', {'status': 'ok'})
+        client = IBKRAPIClient()
+        result = client.tickle()
+        assert result['status'] == 'ok'
+    
+    def test_tickle_authentication_error(self, mock_gateway):
+        """Test tickle with authentication error"""
+        mock_gateway.set_response('/tickle', status_code=401)
+        client = IBKRAPIClient()
+        with pytest.raises(AuthenticationError):
+            client.tickle()
+    
+    def test_retry_logic(self, mock_gateway):
+        """Test retry logic with exponential backoff"""
+        mock_gateway.set_response('/positions', status_code=500)
+        client = IBKRAPIClient()
+        with pytest.raises(MaxRetriesExceeded):
+            client.get_positions('U1234567')
+```
+
+### Data Normalization Tests
+```python
+# Good: Data normalization testing
+class TestDataNormalization:
+    def test_normalize_positions(self):
+        """Test position data normalization"""
+        api_data = [{
+            'conid': 265598,
+            'symbol': 'AAPL',
+            'secType': 'STK',
+            'position': 100,
+            'marketPrice': 150.25,
+            'currency': 'USD'
+        }]
+        
+        result = normalize_positions(api_data)
+        assert len(result) == 1
+        assert result[0]['conid'] == 265598
+        assert result[0]['quantity'] == 100.0
+        assert result[0]['sec_type'] == 'STK'
+    
+    def test_normalize_positions_missing_data(self):
+        """Test normalization with missing optional data"""
+        api_data = [{
+            'conid': 265598,
+            'symbol': 'AAPL',
+            'secType': 'STK',
+            'position': 100,
+            'currency': 'USD'
+            # Missing marketPrice
+        }]
+        
+        result = normalize_positions(api_data)
+        assert result[0]['market_price'] is None
+```
+
+### Validation Tests
+```python
+# Good: Data validation testing
+class TestDataValidation:
+    def test_balance_reconciliation_valid(self):
+        """Test valid balance reconciliation"""
+        account_data = {
+            'cash_balance': 10000.0,
+            'position_value': 5000.0,
+            'account_value': 15000.0
+        }
+        
+        result = validate_balance_reconciliation(account_data)
+        assert result is True
+    
+    def test_balance_reconciliation_invalid(self):
+        """Test invalid balance reconciliation"""
+        account_data = {
+            'cash_balance': 10000.0,
+            'position_value': 5000.0,
+            'account_value': 20000.0  # Mismatch
+        }
+        
+        with pytest.raises(ValidationError):
+            validate_balance_reconciliation(account_data)
+```
+
+## Integration Testing Standards
+
+### Gateway Integration Tests
+```python
+# Good: Gateway integration testing
+class TestGatewayIntegration:
+    def test_gateway_connection(self, mock_gateway):
+        """Test gateway connection"""
+        mock_gateway.start()
+        client = IBKRAPIClient()
+        assert client.is_connected() is True
+    
+    def test_session_management(self, mock_gateway):
+        """Test session management"""
+        mock_gateway.start()
+        client = IBKRAPIClient()
+        
+        # Test session creation
+        client.authenticate()
+        assert client.is_authenticated() is True
+        
+        # Test session expiry
+        mock_gateway.expire_session()
+        assert client.is_authenticated() is False
+```
+
+### Database Operations Tests
+```python
+# Good: Database operations testing
+class TestDatabaseOperations:
+    def test_upsert_execution(self, test_db):
+        """Test execution upsert operation"""
+        execution_data = {
+            'exec_id': '12345',
+            'side': 'BUY',
+            'shares': 100,
+            'price': 150.0,
+            'currency': 'USD'
+        }
+        
+        result = upsert_execution(test_db, execution_data)
+        assert result is True
+        
+        # Verify data was inserted
+        executions = get_executions(test_db)
+        assert len(executions) == 1
+        assert executions[0]['exec_id'] == '12345'
+    
+    def test_duplicate_execution_handling(self, test_db):
+        """Test handling of duplicate executions"""
+        execution_data = {
+            'exec_id': '12345',
+            'side': 'BUY',
+            'shares': 100,
+            'price': 150.0,
+            'currency': 'USD'
+        }
+        
+        # Insert first time
+        upsert_execution(test_db, execution_data)
+        
+        # Insert same execution again
+        upsert_execution(test_db, execution_data)
+        
+        # Should only have one record
+        executions = get_executions(test_db)
+        assert len(executions) == 1
+```
+
+## Test Fixtures and Mocks
+
+### Sample Data Fixtures
+```python
+# Good: Comprehensive test fixtures
+@pytest.fixture
+def sample_accounts():
+    return [
+        {
+            'accountId': 'U1234567',
+            'accountTitle': 'Individual',
+            'currency': 'USD'
+        }
+    ]
+
+@pytest.fixture
+def sample_positions():
+    return [
+        {
+            'conid': 265598,
+            'symbol': 'AAPL',
+            'secType': 'STK',
+            'position': 100,
+            'marketPrice': 150.25,
+            'marketValue': 15025.00,
+            'currency': 'USD'
+        }
+    ]
+
+@pytest.fixture
+def sample_executions():
+    return [
+        {
+            'execId': '1234.5678',
+            'orderId': 987654321,
+            'time': '2025-10-29T14:30:00Z',
+            'conid': 265598,
+            'symbol': 'AAPL',
+            'side': 'BUY',
+            'shares': 100,
+            'price': 150.00,
+            'currency': 'USD'
+        }
+    ]
+```
+
+### Mock Gateway
+```python
+# Good: Mock gateway implementation
+class MockGateway:
+    def __init__(self):
+        self.authenticated = False
+        self.responses = {}
+        self.status_codes = {}
+    
+    def start(self):
+        """Start mock gateway"""
+        self.running = True
+    
+    def stop(self):
+        """Stop mock gateway"""
+        self.running = False
+    
+    def set_response(self, endpoint, response, status_code=200):
+        """Set mock response for endpoint"""
+        self.responses[endpoint] = response
+        self.status_codes[endpoint] = status_code
+    
+    def get_response(self, endpoint):
+        """Get mock response for endpoint"""
+        return self.responses.get(endpoint, {}), self.status_codes.get(endpoint, 200)
+```
+
+## Performance Testing
+
+### Load Testing
+```python
+# Good: Performance testing
+class TestPerformance:
+    def test_sync_performance(self, test_db):
+        """Test sync performance with large dataset"""
+        # Create large dataset
+        large_dataset = create_large_dataset(10000)
+        
+        start_time = time.time()
+        sync_data(test_db, large_dataset)
+        end_time = time.time()
+        
+        # Should complete within 30 seconds
+        assert (end_time - start_time) < 30.0
+    
+    def test_memory_usage(self, test_db):
+        """Test memory usage during sync"""
+        import tracemalloc
+        
+        tracemalloc.start()
+        sync_large_dataset(test_db)
+        snapshot = tracemalloc.take_snapshot()
+        
+        # Memory usage should be reasonable
+        memory_usage = sum(stat.size for stat in snapshot.statistics('lineno'))
+        assert memory_usage < 100 * 1024 * 1024  # 100MB
+```
+
+## Security Testing
+
+### Authentication Testing
+```python
+# Good: Security testing
+class TestSecurity:
+    def test_no_credential_storage(self):
+        """Test that credentials are not stored"""
+        client = IBKRAPIClient()
+        
+        # Check that no credentials are stored
+        assert not hasattr(client, 'username')
+        assert not hasattr(client, 'password')
+        assert not hasattr(client, 'api_key')
+    
+    def test_data_redaction(self):
+        """Test that sensitive data is redacted in logs"""
+        with caplog.at_level(logging.INFO):
+            client = IBKRAPIClient()
+            client.log_api_call('test', {'accountId': 'U1234567'})
+        
+        # Check that account ID is redacted
+        assert 'U123****' in caplog.text
+        assert 'U1234567' not in caplog.text
+```
+
+## Test Execution and Reporting
+
+### Test Configuration
+```python
+# Good: pytest configuration
+# conftest.py
+import pytest
+from fixtures.mock_gateway import MockGateway
+
+@pytest.fixture(scope="session")
+def mock_gateway():
+    gateway = MockGateway()
+    gateway.start()
+    yield gateway
+    gateway.stop()
+
+@pytest.fixture
+def test_db():
+    """Create test database"""
+    db_path = ":memory:"
+    init_test_database(db_path)
+    yield db_path
+    cleanup_test_database(db_path)
+```
+
+### Test Execution Commands
+```bash
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=src --cov-report=html
+
+# Run specific test file
+pytest tests/unit/test_api_client.py
+
+# Run with verbose output
+pytest -v
+
+# Run integration tests only
+pytest tests/integration/
+```
+
+## Compliance Checklist
+
+### Implementation
+- [ ] Test structure follows standards
+- [ ] Coverage targets are met
+- [ ] All critical paths are tested
+- [ ] Mock services are comprehensive
+- [ ] Performance tests are included
+
+### Operations
+- [ ] Tests run automatically
+- [ ] Coverage reports are generated
+- [ ] Test failures are tracked
+- [ ] Performance benchmarks are monitored
+- [ ] Security tests are included# Testing Standards Rule
+
+## Purpose
+Ensure comprehensive testing coverage and quality for the IBKR Client Portal Web API integration project.
+
+## Scope
+- Unit tests
+- Integration tests
+- End-to-end tests
+- Performance tests
+- Security tests
+
+## Testing Requirements
+
+### Coverage Standards
+- **Line coverage**: Minimum 90%
+- **Branch coverage**: Minimum 80%
+- **Function coverage**: 100%
+- **Critical path coverage**: 100%
+
+### Test Structure
+```
+tests/
+├── unit/
+│   ├── test_api_client.py
+│   ├── test_data_normalization.py
+│   ├── test_validation.py
+│   └── test_retry_logic.py
+├── integration/
+│   ├── test_gateway_integration.py
+│   ├── test_database_operations.py
+│   └── test_sync_workflows.py
+├── fixtures/
+│   ├── sample_responses.py
+│   ├── mock_gateway.py
+│   └── test_data.py
+└── conftest.py
+```
+
+## Unit Testing Standards
+
+### API Client Tests
+```python
+# Good: Comprehensive API client testing
+class TestIBKRAPIClient:
+    def test_tickle_success(self, mock_gateway):
+        """Test successful tickle call"""
+        mock_gateway.set_response('/tickle', {'status': 'ok'})
+        client = IBKRAPIClient()
+        result = client.tickle()
+        assert result['status'] == 'ok'
+    
+    def test_tickle_authentication_error(self, mock_gateway):
+        """Test tickle with authentication error"""
+        mock_gateway.set_response('/tickle', status_code=401)
+        client = IBKRAPIClient()
+        with pytest.raises(AuthenticationError):
+            client.tickle()
+    
+    def test_retry_logic(self, mock_gateway):
+        """Test retry logic with exponential backoff"""
+        mock_gateway.set_response('/positions', status_code=500)
+        client = IBKRAPIClient()
+        with pytest.raises(MaxRetriesExceeded):
+            client.get_positions('U1234567')
+```
+
+### Data Normalization Tests
+```python
+# Good: Data normalization testing
+class TestDataNormalization:
+    def test_normalize_positions(self):
+        """Test position data normalization"""
+        api_data = [{
+            'conid': 265598,
+            'symbol': 'AAPL',
+            'secType': 'STK',
+            'position': 100,
+            'marketPrice': 150.25,
+            'currency': 'USD'
+        }]
+        
+        result = normalize_positions(api_data)
+        assert len(result) == 1
+        assert result[0]['conid'] == 265598
+        assert result[0]['quantity'] == 100.0
+        assert result[0]['sec_type'] == 'STK'
+    
+    def test_normalize_positions_missing_data(self):
+        """Test normalization with missing optional data"""
+        api_data = [{
+            'conid': 265598,
+            'symbol': 'AAPL',
+            'secType': 'STK',
+            'position': 100,
+            'currency': 'USD'
+            # Missing marketPrice
+        }]
+        
+        result = normalize_positions(api_data)
+        assert result[0]['market_price'] is None
+```
+
+### Validation Tests
+```python
+# Good: Data validation testing
+class TestDataValidation:
+    def test_balance_reconciliation_valid(self):
+        """Test valid balance reconciliation"""
+        account_data = {
+            'cash_balance': 10000.0,
+            'position_value': 5000.0,
+            'account_value': 15000.0
+        }
+        
+        result = validate_balance_reconciliation(account_data)
+        assert result is True
+    
+    def test_balance_reconciliation_invalid(self):
+        """Test invalid balance reconciliation"""
+        account_data = {
+            'cash_balance': 10000.0,
+            'position_value': 5000.0,
+            'account_value': 20000.0  # Mismatch
+        }
+        
+        with pytest.raises(ValidationError):
+            validate_balance_reconciliation(account_data)
+```
+
+## Integration Testing Standards
+
+### Gateway Integration Tests
+```python
+# Good: Gateway integration testing
+class TestGatewayIntegration:
+    def test_gateway_connection(self, mock_gateway):
+        """Test gateway connection"""
+        mock_gateway.start()
+        client = IBKRAPIClient()
+        assert client.is_connected() is True
+    
+    def test_session_management(self, mock_gateway):
+        """Test session management"""
+        mock_gateway.start()
+        client = IBKRAPIClient()
+        
+        # Test session creation
+        client.authenticate()
+        assert client.is_authenticated() is True
+        
+        # Test session expiry
+        mock_gateway.expire_session()
+        assert client.is_authenticated() is False
+```
+
+### Database Operations Tests
+```python
+# Good: Database operations testing
+class TestDatabaseOperations:
+    def test_upsert_execution(self, test_db):
+        """Test execution upsert operation"""
+        execution_data = {
+            'exec_id': '12345',
+            'side': 'BUY',
+            'shares': 100,
+            'price': 150.0,
+            'currency': 'USD'
+        }
+        
+        result = upsert_execution(test_db, execution_data)
+        assert result is True
+        
+        # Verify data was inserted
+        executions = get_executions(test_db)
+        assert len(executions) == 1
+        assert executions[0]['exec_id'] == '12345'
+    
+    def test_duplicate_execution_handling(self, test_db):
+        """Test handling of duplicate executions"""
+        execution_data = {
+            'exec_id': '12345',
+            'side': 'BUY',
+            'shares': 100,
+            'price': 150.0,
+            'currency': 'USD'
+        }
+        
+        # Insert first time
+        upsert_execution(test_db, execution_data)
+        
+        # Insert same execution again
+        upsert_execution(test_db, execution_data)
+        
+        # Should only have one record
+        executions = get_executions(test_db)
+        assert len(executions) == 1
+```
+
+## Test Fixtures and Mocks
+
+### Sample Data Fixtures
+```python
+# Good: Comprehensive test fixtures
+@pytest.fixture
+def sample_accounts():
+    return [
+        {
+            'accountId': 'U1234567',
+            'accountTitle': 'Individual',
+            'currency': 'USD'
+        }
+    ]
+
+@pytest.fixture
+def sample_positions():
+    return [
+        {
+            'conid': 265598,
+            'symbol': 'AAPL',
+            'secType': 'STK',
+            'position': 100,
+            'marketPrice': 150.25,
+            'marketValue': 15025.00,
+            'currency': 'USD'
+        }
+    ]
+
+@pytest.fixture
+def sample_executions():
+    return [
+        {
+            'execId': '1234.5678',
+            'orderId': 987654321,
+            'time': '2025-10-29T14:30:00Z',
+            'conid': 265598,
+            'symbol': 'AAPL',
+            'side': 'BUY',
+            'shares': 100,
+            'price': 150.00,
+            'currency': 'USD'
+        }
+    ]
+```
+
+### Mock Gateway
+```python
+# Good: Mock gateway implementation
+class MockGateway:
+    def __init__(self):
+        self.authenticated = False
+        self.responses = {}
+        self.status_codes = {}
+    
+    def start(self):
+        """Start mock gateway"""
+        self.running = True
+    
+    def stop(self):
+        """Stop mock gateway"""
+        self.running = False
+    
+    def set_response(self, endpoint, response, status_code=200):
+        """Set mock response for endpoint"""
+        self.responses[endpoint] = response
+        self.status_codes[endpoint] = status_code
+    
+    def get_response(self, endpoint):
+        """Get mock response for endpoint"""
+        return self.responses.get(endpoint, {}), self.status_codes.get(endpoint, 200)
+```
+
+## Performance Testing
+
+### Load Testing
+```python
+# Good: Performance testing
+class TestPerformance:
+    def test_sync_performance(self, test_db):
+        """Test sync performance with large dataset"""
+        # Create large dataset
+        large_dataset = create_large_dataset(10000)
+        
+        start_time = time.time()
+        sync_data(test_db, large_dataset)
+        end_time = time.time()
+        
+        # Should complete within 30 seconds
+        assert (end_time - start_time) < 30.0
+    
+    def test_memory_usage(self, test_db):
+        """Test memory usage during sync"""
+        import tracemalloc
+        
+        tracemalloc.start()
+        sync_large_dataset(test_db)
+        snapshot = tracemalloc.take_snapshot()
+        
+        # Memory usage should be reasonable
+        memory_usage = sum(stat.size for stat in snapshot.statistics('lineno'))
+        assert memory_usage < 100 * 1024 * 1024  # 100MB
+```
+
+## Security Testing
+
+### Authentication Testing
+```python
+# Good: Security testing
+class TestSecurity:
+    def test_no_credential_storage(self):
+        """Test that credentials are not stored"""
+        client = IBKRAPIClient()
+        
+        # Check that no credentials are stored
+        assert not hasattr(client, 'username')
+        assert not hasattr(client, 'password')
+        assert not hasattr(client, 'api_key')
+    
+    def test_data_redaction(self):
+        """Test that sensitive data is redacted in logs"""
+        with caplog.at_level(logging.INFO):
+            client = IBKRAPIClient()
+            client.log_api_call('test', {'accountId': 'U1234567'})
+        
+        # Check that account ID is redacted
+        assert 'U123****' in caplog.text
+        assert 'U1234567' not in caplog.text
+```
+
+## Test Execution and Reporting
+
+### Test Configuration
+```python
+# Good: pytest configuration
+# conftest.py
+import pytest
+from fixtures.mock_gateway import MockGateway
+
+@pytest.fixture(scope="session")
+def mock_gateway():
+    gateway = MockGateway()
+    gateway.start()
+    yield gateway
+    gateway.stop()
+
+@pytest.fixture
+def test_db():
+    """Create test database"""
+    db_path = ":memory:"
+    init_test_database(db_path)
+    yield db_path
+    cleanup_test_database(db_path)
+```
+
+### Test Execution Commands
+```bash
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=src --cov-report=html
+
+# Run specific test file
+pytest tests/unit/test_api_client.py
+
+# Run with verbose output
+pytest -v
+
+# Run integration tests only
+pytest tests/integration/
+```
+
+## Compliance Checklist
+
+### Implementation
+- [ ] Test structure follows standards
+- [ ] Coverage targets are met
+- [ ] All critical paths are tested
+- [ ] Mock services are comprehensive
+- [ ] Performance tests are included
+
+### Operations
+- [ ] Tests run automatically
+- [ ] Coverage reports are generated
+- [ ] Test failures are tracked
+- [ ] Performance benchmarks are monitored
+- [ ] Security tests are included

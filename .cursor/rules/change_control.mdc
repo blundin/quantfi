@@ -1,0 +1,427 @@
+# Change Control Rule
+
+## Purpose
+Manage changes systematically to prevent unintended consequences and maintain system stability in the IBKR Client Portal Web API integration.
+
+## Scope
+- Code changes
+- Configuration changes
+- Database schema changes
+- Documentation updates
+- Dependency updates
+
+## Change Classification
+
+### Change Types
+- **Critical**: Changes that affect security, data integrity, or core functionality
+- **Major**: Changes that affect user experience or system performance
+- **Minor**: Changes that improve code quality or add non-critical features
+- **Emergency**: Changes required to fix critical issues in production
+
+### Change Impact Levels
+- **High**: Changes that affect multiple components or require coordination
+- **Medium**: Changes that affect single components but may have side effects
+- **Low**: Changes that are isolated and have minimal impact
+
+## Change Control Process
+
+### Change Request Workflow
+1. **Initiation**: Identify need for change
+2. **Documentation**: Document change details and rationale
+3. **Impact Assessment**: Evaluate potential effects
+4. **Approval**: Get appropriate approvals
+5. **Implementation**: Execute change with proper testing
+6. **Verification**: Confirm change works as expected
+7. **Documentation**: Update relevant documentation
+
+### Change Request Template
+```markdown
+## Change Request
+
+**ID**: CR-YYYY-MM-DD-001
+**Date**: 2025-01-15
+**Requestor**: [Name]
+**Type**: [Critical/Major/Minor/Emergency]
+**Impact**: [High/Medium/Low]
+
+### Description
+Brief description of the proposed change.
+
+### Rationale
+Why this change is needed.
+
+### Impact Assessment
+- **Components Affected**: List affected components
+- **Dependencies**: List any dependencies
+- **Risks**: Identify potential risks
+- **Mitigation**: Describe risk mitigation strategies
+
+### Implementation Plan
+1. Step 1
+2. Step 2
+3. Step 3
+
+### Testing Plan
+- [ ] Unit tests
+- [ ] Integration tests
+- [ ] User acceptance testing
+- [ ] Performance testing
+
+### Rollback Plan
+Description of how to rollback if needed.
+
+### Approval
+- [ ] Technical Lead
+- [ ] Security Review
+- [ ] User Acceptance
+```
+
+## Code Change Control
+
+### Pre-commit Requirements
+```bash
+# Good: Pre-commit checklist
+#!/bin/bash
+# pre-commit.sh
+
+echo "Running pre-commit checks..."
+
+# 1. Run tests
+echo "Running tests..."
+pytest tests/ || exit 1
+
+# 2. Check code quality
+echo "Running linting..."
+flake8 src/ || exit 1
+
+# 3. Check security
+echo "Running security checks..."
+bandit -r src/ || exit 1
+
+# 4. Check documentation
+echo "Checking documentation..."
+python -m doctest docs/*.md || exit 1
+
+echo "All checks passed!"
+```
+
+### Code Review Requirements
+```python
+# Good: Code review checklist
+class CodeReviewChecklist:
+    def __init__(self):
+        self.checks = [
+            self.check_functionality,
+            self.check_security,
+            self.check_performance,
+            self.check_maintainability,
+            self.check_documentation
+        ]
+    
+    def check_functionality(self, code):
+        """Check if code meets functional requirements"""
+        # Verify business logic is correct
+        # Check error handling
+        # Validate input/output
+        pass
+    
+    def check_security(self, code):
+        """Check security implications"""
+        # No hardcoded credentials
+        # Proper input validation
+        # Secure data handling
+        # Appropriate logging
+        pass
+    
+    def check_performance(self, code):
+        """Check performance implications"""
+        # No obvious performance issues
+        # Appropriate use of caching
+        # Efficient database queries
+        # Memory usage considerations
+        pass
+    
+    def check_maintainability(self, code):
+        """Check code maintainability"""
+        # Clear variable names
+        # Appropriate comments
+        # Modular design
+        # Consistent style
+        pass
+    
+    def check_documentation(self, code):
+        """Check documentation quality"""
+        # Docstrings for functions
+        # Comments for complex logic
+        # Updated README if needed
+        # API documentation current
+        pass
+```
+
+## Database Change Control
+
+### Schema Migration Process
+```python
+# Good: Database migration process
+class DatabaseMigration:
+    def __init__(self, db_path):
+        self.db_path = db_path
+        self.migration_log = []
+    
+    def create_migration(self, name, description):
+        """Create new migration"""
+        migration_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{name}"
+        
+        migration = {
+            'id': migration_id,
+            'name': name,
+            'description': description,
+            'created_at': datetime.now(),
+            'status': 'pending'
+        }
+        
+        self.migration_log.append(migration)
+        return migration_id
+    
+    def apply_migration(self, migration_id):
+        """Apply migration with rollback capability"""
+        migration = self.get_migration(migration_id)
+        
+        try:
+            # Backup database before migration
+            self.backup_database()
+            
+            # Apply migration
+            self.execute_migration(migration)
+            
+            # Update migration status
+            migration['status'] = 'applied'
+            migration['applied_at'] = datetime.now()
+            
+        except Exception as e:
+            # Rollback on error
+            self.rollback_migration(migration_id)
+            migration['status'] = 'failed'
+            migration['error'] = str(e)
+            raise
+    
+    def rollback_migration(self, migration_id):
+        """Rollback migration"""
+        migration = self.get_migration(migration_id)
+        
+        # Restore from backup
+        self.restore_database()
+        
+        # Update migration status
+        migration['status'] = 'rolled_back'
+        migration['rolled_back_at'] = datetime.now()
+```
+
+### Data Migration Validation
+```python
+# Good: Data migration validation
+def validate_migration(old_data, new_data):
+    """Validate data migration integrity"""
+    validation_results = {
+        'record_count_match': len(old_data) == len(new_data),
+        'data_integrity': True,
+        'constraint_violations': [],
+        'data_loss': []
+    }
+    
+    # Check record count
+    if not validation_results['record_count_match']:
+        validation_results['data_loss'].append(
+            f"Record count mismatch: {len(old_data)} -> {len(new_data)}"
+        )
+    
+    # Check data integrity
+    for i, (old_record, new_record) in enumerate(zip(old_data, new_data)):
+        if not validate_record_integrity(old_record, new_record):
+            validation_results['data_integrity'] = False
+            validation_results['constraint_violations'].append(f"Record {i}")
+    
+    return validation_results
+```
+
+## Configuration Change Control
+
+### Configuration Management
+```python
+# Good: Configuration change management
+class ConfigurationManager:
+    def __init__(self, config_path):
+        self.config_path = config_path
+        self.config_history = []
+        self.load_config()
+    
+    def load_config(self):
+        """Load current configuration"""
+        with open(self.config_path, 'r') as f:
+            self.current_config = yaml.safe_load(f)
+    
+    def update_config(self, changes, reason):
+        """Update configuration with change tracking"""
+        # Create backup
+        backup_path = f"{self.config_path}.backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        shutil.copy2(self.config_path, backup_path)
+        
+        # Apply changes
+        updated_config = self.current_config.copy()
+        updated_config.update(changes)
+        
+        # Validate new configuration
+        if not self.validate_config(updated_config):
+            raise ValueError("Invalid configuration")
+        
+        # Save new configuration
+        with open(self.config_path, 'w') as f:
+            yaml.dump(updated_config, f, default_flow_style=False)
+        
+        # Record change
+        change_record = {
+            'timestamp': datetime.now(),
+            'changes': changes,
+            'reason': reason,
+            'backup_path': backup_path
+        }
+        self.config_history.append(change_record)
+        
+        self.current_config = updated_config
+    
+    def rollback_config(self, change_index):
+        """Rollback to previous configuration"""
+        if change_index >= len(self.config_history):
+            raise ValueError("Invalid change index")
+        
+        change = self.config_history[change_index]
+        shutil.copy2(change['backup_path'], self.config_path)
+        self.load_config()
+```
+
+## Emergency Change Procedures
+
+### Emergency Change Process
+```python
+# Good: Emergency change process
+class EmergencyChange:
+    def __init__(self, issue_description, severity):
+        self.issue_description = issue_description
+        self.severity = severity
+        self.change_id = f"EMERGENCY-{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        self.approvals = []
+    
+    def execute_emergency_change(self, change_plan):
+        """Execute emergency change with minimal process"""
+        # 1. Document the emergency
+        self.document_emergency()
+        
+        # 2. Get minimal approvals (can be verbal)
+        self.get_emergency_approvals()
+        
+        # 3. Implement change
+        self.implement_change(change_plan)
+        
+        # 4. Verify fix
+        self.verify_fix()
+        
+        # 5. Document for later review
+        self.document_for_review()
+    
+    def document_emergency(self):
+        """Document emergency situation"""
+        emergency_log = {
+            'change_id': self.change_id,
+            'timestamp': datetime.now(),
+            'issue': self.issue_description,
+            'severity': self.severity,
+            'impact': 'System unavailable'
+        }
+        
+        with open(f"emergency_logs/{self.change_id}.json", 'w') as f:
+            json.dump(emergency_log, f, indent=2)
+    
+    def get_emergency_approvals(self):
+        """Get emergency approvals"""
+        # In real emergency, this might be a phone call
+        # For now, document who approved
+        self.approvals.append({
+            'approver': 'Technical Lead',
+            'timestamp': datetime.now(),
+            'method': 'verbal'
+        })
+```
+
+## Change Monitoring and Reporting
+
+### Change Tracking
+```python
+# Good: Change tracking and reporting
+class ChangeTracker:
+    def __init__(self):
+        self.changes = []
+        self.metrics = {
+            'total_changes': 0,
+            'successful_changes': 0,
+            'failed_changes': 0,
+            'rollbacks': 0
+        }
+    
+    def track_change(self, change):
+        """Track change execution"""
+        change['tracking_id'] = len(self.changes) + 1
+        change['start_time'] = datetime.now()
+        self.changes.append(change)
+        self.metrics['total_changes'] += 1
+    
+    def update_change_status(self, tracking_id, status, details=None):
+        """Update change status"""
+        change = self.get_change(tracking_id)
+        change['status'] = status
+        change['end_time'] = datetime.now()
+        
+        if details:
+            change['details'] = details
+        
+        # Update metrics
+        if status == 'successful':
+            self.metrics['successful_changes'] += 1
+        elif status == 'failed':
+            self.metrics['failed_changes'] += 1
+        elif status == 'rolled_back':
+            self.metrics['rollbacks'] += 1
+    
+    def generate_report(self):
+        """Generate change management report"""
+        report = {
+            'period': f"{datetime.now().strftime('%Y-%m-%d')}",
+            'metrics': self.metrics,
+            'recent_changes': self.changes[-10:],  # Last 10 changes
+            'success_rate': self.metrics['successful_changes'] / self.metrics['total_changes'] * 100
+        }
+        
+        return report
+```
+
+## Compliance Checklist
+
+### Change Management
+- [ ] Change request process is documented
+- [ ] Impact assessment is performed
+- [ ] Approvals are obtained
+- [ ] Testing is completed
+- [ ] Rollback plan is ready
+
+### Implementation
+- [ ] Changes are tracked
+- [ ] Documentation is updated
+- [ ] Monitoring is in place
+- [ ] Team is notified
+- [ ] Post-implementation review is scheduled
+
+### Emergency Procedures
+- [ ] Emergency process is defined
+- [ ] Emergency contacts are current
+- [ ] Rollback procedures are tested
+- [ ] Communication plan is ready
+- [ ] Post-emergency review is scheduled
