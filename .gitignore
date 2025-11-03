@@ -27,6 +27,7 @@ logs/
 /.DS_Store
 .vscode/
 .idea/
+# .cursor/  # Optional: Uncomment to keep Cursor rules private (for contributors)
 
 # Backup files
 *.backup
