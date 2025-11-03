@@ -1,8 +1,38 @@
+# Python
 /venv/
-/.env
-/.env.*
-/data/
-/.ipynb_checkpoints/
 /**/__pycache__/
 /**/*.pyc
+*.py[cod]
+*.so
+.Python
+
+# Environment and secrets
+/.env
+/.env.*
+!.env.example
+
+# Data and databases
+/data/
+*.db
+*.db-shm
+*.db-wal
+*.db-*
+
+# Logs
+*.log
+logs/
+
+# IDE and OS
+/.ipynb_checkpoints/
 /.DS_Store
+.vscode/
+.idea/
+
+# Backup files
+*.backup
+*.bak
+backups/
+
+# Temporary files
+*.tmp
+*.temp

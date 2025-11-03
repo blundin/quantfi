@@ -1,0 +1,195 @@
+---
+alwaysApply: true
+---
+
+# Repository Security & Secrets Prevention Rule
+
+## Purpose
+Prevent secrets, credentials, and sensitive data from being committed to version control or pushed to GitHub. This rule ensures the AI agent understands and follows security best practices.
+
+## Scope
+- Git operations (commit, push)
+- File access and reading
+- Code generation and suggestions
+- Documentation and examples
+
+## CRITICAL: .env File Access
+
+### NEVER Access .env Files
+- ❌ **NEVER** use `read_file` on `.env` or `.env.*` files (except `.env.example`)
+- ❌ **NEVER** grep or search for `.env` file contents
+- ❌ **NEVER** reference or use actual secret values
+- ❌ **NEVER** attempt to validate `.env` contents directly
+
+### ALWAYS Use .env.example
+- ✅ **ONLY** reference `.env.example` for structure
+- ✅ **ONLY** show template/placeholder values
+- ✅ **ONLY** provide instructions for user to manually update
+
+## Git Protection Mechanisms
+
+### Pre-commit Hook
+- **Location**: `.git/hooks/pre-commit`
+- **Purpose**: Scans staged files for secret patterns before commit
+- **Action**: Blocks commit if secrets detected
+- **Bypass**: `git commit --no-verify` (use with extreme caution)
+
+### Pre-push Hook
+- **Location**: `.git/hooks/pre-push`
+- **Purpose**: Final check before pushing to GitHub
+- **Action**: Blocks push if secrets detected
+- **Bypass**: `git push --no-verify` (use with extreme caution)
+
+### .gitignore Protection
+- **Patterns**:
+  - `/.env` and `/.env.*` (all environment files)
+  - `*.db` and `*.db-*` (database files)
+  - `*.log` and `logs/` (log files)
+  - `backups/` (backup files)
+- **Verification**: Always check `git check-ignore <file>` before suggesting file operations
+
+## Secret Detection Patterns
+
+The hooks detect these patterns (and should be avoided in code):
+
+### API Keys & Tokens
+- `api_key = "..."` (long strings)
+- `secret_key = "..."` (long strings)
+- `access_token = "..."` (long strings)
+- `auth_token = "..."` (long strings)
+
+### Passwords & Credentials
+- `password = "..."` (unless in comments/examples)
+- Connection strings: `://user:pass@host`
+
+### Encryption Keys
+- `encryption_key = "..."` (32+ character strings)
+- `private_key = "-----BEGIN"` (private key files)
+
+### Common Service Keys
+- Stripe: `sk_...` or `pk_...`
+- Google: `AIza...`
+- AWS: `AKIA...`
+
+## Code Generation Rules
+
+### When Generating Code
+- ✅ **Always use placeholders**: `"your-secure-key-here"`, `"U1234567"`, `"change-me"`
+- ✅ **Reference environment variables**: `os.getenv('DB_ENCRYPTION_KEY')`
+- ✅ **Show template examples**: Use `.env.example` format
+- ✅ **Document in comments**: "Set this in .env file"
+
+### NEVER Do This
+- ❌ Hardcode actual keys/passwords
+- ❌ Use real account IDs in examples (use `U1234567` placeholder)
+- ❌ Include actual encryption keys
+- ❌ Show real connection strings with passwords
+
+## File Operations
+
+### Safe to Read
+- ✅ `.env.example` (template file)
+- ✅ Source code files
+- ✅ Test files
+- ✅ Documentation
+- ✅ Configuration templates
+
+### NEVER Read
+- ❌ `.env` (actual secrets)
+- ❌ `.env.local`, `.env.production`, etc. (secret files)
+- ❌ `*.db` files (may contain sensitive data)
+- ❌ Log files (may contain sensitive data)
+
+### When Suggesting File Operations
+- ✅ Check `.gitignore` first
+- ✅ Verify file is not in ignored patterns
+- ✅ Warn if file might contain secrets
+
+## Testing Security
+
+### Test Hooks Work
+```bash
+# Test pre-commit (should block):
+echo 'password = "secret123"' > test.py
+git add test.py
+git commit -m "test"  # Should be blocked
+rm test.py
+```
+
+### Verify Protection
+```bash
+# Check if .env is ignored
+git check-ignore .env
+
+# Check what's tracked
+git ls-files | grep -E '\.env|\.key|secret'
+```
+
+## Agent Responsibilities
+
+### Before Committing/Pushing Code
+1. ✅ Verify no hardcoded secrets
+2. ✅ Check file is not in `.gitignore`
+3. ✅ Use placeholders in examples
+4. ✅ Reference `.env.example` for structure
+
+### When User Asks About Secrets
+1. ✅ Provide instructions only (never read actual `.env`)
+2. ✅ Show template structure from `.env.example`
+3. ✅ Remind user to manually update `.env`
+4. ✅ Verify `.env` is in `.gitignore`
+
+### When Writing Code
+1. ✅ Use `os.getenv()` for configuration
+2. ✅ Never hardcode secrets
+3. ✅ Use placeholders in examples
+4. ✅ Document required environment variables
+
+## Emergency Response
+
+### If Secret Accidentally Committed
+1. **Immediately**: Don't push if not already pushed
+2. **If pushed**: User must rotate secrets immediately
+3. **Remove from history**: Use `git filter-branch` or BFG Repo-Cleaner
+4. **Rotate secrets**: All exposed secrets must be changed
+
+### If Hook Blocks Legitimate Commit
+- **False positive**: Can use `--no-verify` but verify it's safe
+- **Update hook**: If pattern is too aggressive, adjust patterns
+- **Document**: Add exclusion pattern if needed
+
+## Compliance Checklist
+
+### Before Any Git Operation
+- [ ] No `.env` files in staging area
+- [ ] No hardcoded secrets in code
+- [ ] All placeholders used in examples
+- [ ] `.env.example` updated if structure changes
+
+### When Generating Examples
+- [ ] Use placeholder values
+- [ ] Reference `.env.example`
+- [ ] Document manual setup required
+- [ ] Never show real secrets
+
+## Integration with Other Rules
+
+### Works With
+- `.cursor/rules/env_security.mdc` - Environment file access rules
+- `.cursor/rules/security_compliance.mdc` - Security compliance standards
+
+### Consistent With
+- All security rules in `.cursor/rules/security_compliance.mdc`
+- Data quality rules (no secrets in logs)
+- API integration rules (no credentials in code)
+
+## Summary
+
+**Core Principle**: Never access, read, or use actual secrets. Always use placeholders and templates. The git hooks will catch mistakes, but the agent must proactively prevent secret exposure.
+
+**Key Actions**:
+1. ✅ Never read `.env` files
+2. ✅ Use placeholders in all code/examples
+3. ✅ Verify `.gitignore` before file operations
+4. ✅ Trust the hooks will catch mistakes
+5. ✅ Report security issues immediately

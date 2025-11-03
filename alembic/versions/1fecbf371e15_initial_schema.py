@@ -25,7 +25,7 @@ def upgrade() -> None:
     op.create_table(
         "accounts",
         sa.Column("id", sa.Text(), nullable=False, primary_key=True),
-        sa.Column("title", sa.Text(), nullable=False),
+        sa.Column("name", sa.Text(), nullable=False),
         sa.Column("base_currency", sa.Text(), nullable=False),
         sa.Column("created_at", sa.Text(), nullable=False),
         sa.Column("updated_at", sa.Text(), nullable=False),
