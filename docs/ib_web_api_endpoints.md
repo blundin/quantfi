@@ -172,7 +172,7 @@ curl -k "https://localhost:5000/v1/api/portfolio/ACCOUNT_ID/positions"
 ```bash
 curl -k https://localhost:5000/v1/api/iserver/account/trades
 ```
-  - Example response:
+  - Example response (stock):
 ```json
 [
   {
@@ -190,6 +190,25 @@ curl -k https://localhost:5000/v1/api/iserver/account/trades
 ]
 ```
 
+  - Example response (option):
+```json
+[
+  {
+    "execId": "9876.5432",
+    "orderId": 123456789,
+    "time": "2025-10-29T15:00:00Z",
+    "conid": 345678901,
+    "symbol": "AAPL  250117C00150000",
+    "secType": "OPT",
+    "side": "SELL",
+    "shares": 10,
+    "price": 5.50,
+    "currency": "USD"
+  }
+]
+```
+**Note**: The `shares` field is used for both stocks (where it represents shares) and options (where it represents contracts). IBKR API consistently uses this field name regardless of asset type.
+
 - Field reference:
   - `execId` (string): unique execution identifier.
   - `orderId` (integer): associated order id; useful for grouping fills.
@@ -198,8 +217,8 @@ curl -k https://localhost:5000/v1/api/iserver/account/trades
   - `symbol` (string): ticker symbol at time of execution.
   - `secType` (string): instrument type (STK, OPT, etc.).
   - `side` (string): BUY or SELL.
-  - `shares` (number): executed quantity; negative not expected.
-  - `price` (number): execution price per unit.
+  - `shares` (number): executed quantity; negative not expected. For stocks/ETFs this is shares, for options it's contracts. **Note**: Our schema normalizes this to `quantity` during ingestion for multi-asset consistency.
+  - `price` (number): execution price per unit (for options, this is premium per contract).
   - `currency` (string): execution currency.
 
 ## Cash Transactions

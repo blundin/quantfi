@@ -19,50 +19,93 @@ Ensure high-quality, consistent, and reliable data throughout the IBKR Client Po
 ### Validation Rules
 - **Balance reconciliation**: Cash + positions ≈ account value (within tolerance)
 - **Position consistency**: Negative quantities only for short positions
-- **Trade validation**: Shares > 0, side in {BUY, SELL}, price > 0
+- **Trade validation**: Quantity > 0, side in {BUY, SELL}, price > 0
 - **Date validation**: No future dates, monotonic execution times
 - **Currency validation**: Valid ISO 4217 codes, consistent formatting
 
+### Currency Handling
+- **Never use float/REAL for currency amounts** - Use INTEGER with fixed-point representation (micro-dollars for USD = 1,000,000x multiplier)
+- **Support subpenny precision** - Trading data requires 6 decimal places (micro-dollars), not just 2 (cents)
+- **Use `decimal.Decimal` for calculations** - Convert to/from integer at database boundaries
+- **Store exchange rates as basis points** - Multiply by 10000 (e.g., 1.2345 → 12345)
+
 ### Data Normalization
 ```python
-# Good: Consistent data normalization
+# Good: Proper currency handling with Decimal
+from decimal import Decimal
+
+# Precision constants
+MICRO_DOLLARS = 1_000_000  # 6 decimal places for subpenny precision
+JPY_PRECISION = 1_000       # 3 decimal places for JPY
+
+def currency_to_int(amount: Decimal, currency: str) -> int:
+    """Convert Decimal to fixed-point integer (micro-dollars for USD, 6 decimal places)."""
+    if currency in ['USD', 'EUR', 'GBP', 'CAD', 'AUD']:
+        return int(amount * MICRO_DOLLARS)  # 6 decimal places for subpenny support
+    elif currency == 'JPY':
+        return int(amount * JPY_PRECISION)  # 3 decimal places
+    else:
+        return int(amount * MICRO_DOLLARS)  # Default to micro-dollars
+
 def normalize_execution(api_data):
-    """Normalize execution data from API"""
+    """Normalize execution data from API
+    
+    IBKR API returns 'shares' field for all asset types (shares for stocks, contracts for options).
+    We normalize to 'quantity' in our schema for multi-asset consistency.
+    """
+    currency = api_data['currency'].upper()
+    price_decimal = Decimal(str(api_data['price']))
+    
     return {
         'exec_id': api_data['execId'],
         'order_id': api_data.get('orderId'),
         'side': api_data['side'].upper(),
-        'shares': float(api_data['shares']),
-        'price': float(api_data['price']),
-        'currency': api_data['currency'].upper(),
+        'quantity': float(api_data['shares']),  # Normalize API 'shares' → DB 'quantity'
+        'price': currency_to_int(price_decimal, currency),  # Store as integer (micro-dollars)
+        'currency': currency,
         'executed_at': parse_iso_datetime(api_data['time']),
         'ingested_at': datetime.utcnow().isoformat()
     }
 
+# Bad: Using float for currency (precision errors)
+def normalize_execution_bad(api_data):
+    return {
+        'price': float(api_data['price']),  # NEVER use float for currency
+        'currency': api_data['currency']
+    }
+
 # Bad: Inconsistent normalization
-def normalize_execution(api_data):
+def normalize_execution_inconsistent(api_data):
     return api_data  # No normalization
 ```
 
 ### Database Constraints
 ```sql
--- Good: Proper constraints
+-- Good: Proper constraints with INTEGER for currency
 CREATE TABLE executions (
     id INTEGER PRIMARY KEY,
     exec_id TEXT NOT NULL UNIQUE,
     side TEXT NOT NULL CHECK (side IN ('BUY', 'SELL')),
-    shares REAL NOT NULL CHECK (shares > 0),
-    price REAL NOT NULL CHECK (price > 0),
-    currency TEXT NOT NULL CHECK (length(currency) = 3)
+    quantity REAL NOT NULL CHECK (quantity > 0),  -- Generic quantity (shares for stocks, contracts for options)
+    price INTEGER NOT NULL CHECK (price > 0),  -- INTEGER in fixed-point (micro-dollars for USD)
+    currency TEXT NOT NULL CHECK (length(currency) = 3),
+    commission_amount INTEGER  -- INTEGER for currency amounts
+);
+
+-- Bad: Using REAL for currency (precision errors)
+CREATE TABLE executions_bad (
+    id INTEGER PRIMARY KEY,
+    price REAL NOT NULL,  -- NEVER use REAL for currency
+    commission_amount REAL  -- NEVER use REAL for currency
 );
 
 -- Bad: No constraints
-CREATE TABLE executions (
+CREATE TABLE executions_no_constraints (
     id INTEGER PRIMARY KEY,
     exec_id TEXT,
     side TEXT,
-    shares REAL,
-    price REAL
+    quantity REAL,  -- Should be NOT NULL with CHECK constraint
+    price INTEGER  -- Even with INTEGER, missing constraints is bad
 );
 ```
 
@@ -70,17 +113,33 @@ CREATE TABLE executions (
 
 ### Balance Reconciliation
 ```python
-def validate_balance_reconciliation(account_id, tolerance=0.01):
-    """Validate that cash + positions ≈ account value"""
-    cash_balance = get_cash_balance(account_id)
-    position_value = get_total_position_value(account_id)
-    account_value = get_account_value(account_id)
+from decimal import Decimal
+
+def int_to_currency(amount_int: int, currency: str) -> Decimal:
+    """Convert fixed-point integer to Decimal."""
+    if currency in ['USD', 'EUR', 'GBP', 'CAD', 'AUD']:
+        return Decimal(amount_int) / MICRO_DOLLARS
+    elif currency == 'JPY':
+        return Decimal(amount_int) / JPY_PRECISION
+    else:
+        return Decimal(amount_int) / MICRO_DOLLARS
+
+def validate_balance_reconciliation(account_id, currency='USD', tolerance_micro=100):
+    """Validate that cash + positions ≈ account value (using INTEGER micro-dollars, 6 decimal places)."""
+    cash_balance_micro = get_cash_balance_micro(account_id)
+    position_value_micro = get_total_position_value_micro(account_id)
+    account_value_micro = get_account_value_micro(account_id)
     
-    calculated_value = cash_balance + position_value
-    difference = abs(calculated_value - account_value)
+    calculated_value_micro = cash_balance_micro + position_value_micro
+    difference_micro = abs(calculated_value_micro - account_value_micro)
     
-    if difference > tolerance:
-        raise ValidationError(f"Balance mismatch: {difference} > {tolerance}")
+    if difference_micro > tolerance_micro:
+        # Convert to Decimal for error message
+        difference_decimal = int_to_currency(difference_micro, currency)
+        tolerance_decimal = int_to_currency(tolerance_micro, currency)
+        raise ValidationError(
+            f"Balance mismatch: {difference_decimal} > {tolerance_decimal}"
+        )
     
     return True
 ```
@@ -105,280 +164,8 @@ def validate_position_consistency():
 ```python
 def validate_trade_data(execution):
     """Validate individual trade data"""
-    if execution['shares'] <= 0:
-        raise ValidationError("Shares must be positive")
-    
-    if execution['side'] not in ['BUY', 'SELL']:
-        raise ValidationError("Side must be BUY or SELL")
-    
-    if execution['price'] <= 0:
-        raise ValidationError("Price must be positive")
-    
-    if not is_valid_currency(execution['currency']):
-        raise ValidationError("Invalid currency code")
-    
-    return True
-```
-
-## Data Quality Monitoring
-
-### Automated Checks
-```python
-def run_data_quality_checks():
-    """Run all data quality checks"""
-    checks = [
-        validate_balance_reconciliation,
-        validate_position_consistency,
-        validate_trade_data,
-        validate_date_consistency,
-        check_for_outliers
-    ]
-    
-    results = []
-    for check in checks:
-        try:
-            check()
-            results.append({'check': check.__name__, 'status': 'PASS'})
-        except ValidationError as e:
-            results.append({'check': check.__name__, 'status': 'FAIL', 'error': str(e)})
-    
-    return results
-```
-
-### Outlier Detection
-```python
-def detect_pnl_outliers(threshold=3.0):
-    """Detect unusual P&L changes"""
-    pnl_changes = get_daily_pnl_changes()
-    
-    if len(pnl_changes) < 2:
-        return []
-    
-    mean_change = np.mean(pnl_changes)
-    std_change = np.std(pnl_changes)
-    
-    outliers = []
-    for i, change in enumerate(pnl_changes):
-        z_score = abs(change - mean_change) / std_change
-        if z_score > threshold:
-            outliers.append({
-                'date': i,
-                'change': change,
-                'z_score': z_score
-            })
-    
-    return outliers
-```
-
-## Error Handling and Recovery
-
-### Data Recovery
-```python
-def recover_from_data_errors():
-    """Recover from data quality issues"""
-    # 1. Identify problematic records
-    bad_records = identify_bad_records()
-    
-    # 2. Attempt to fix automatically
-    fixed_records = []
-    for record in bad_records:
-        try:
-            fixed_record = auto_fix_record(record)
-            fixed_records.append(fixed_record)
-        except AutoFixError:
-            # Mark for manual review
-            mark_for_manual_review(record)
-    
-    # 3. Report results
-    logger.info(f"Fixed {len(fixed_records)} records automatically")
-    logger.info(f"{len(bad_records) - len(fixed_records)} records need manual review")
-    
-    return fixed_records
-```
-
-### Partial Data Handling
-```python
-def handle_partial_sync_failure(failed_entities, successful_entities):
-    """Handle partial sync failures gracefully"""
-    # Continue with successful entities
-    for entity in successful_entities:
-        process_entity_data(entity)
-    
-    # Log failed entities for retry
-    for entity in failed_entities:
-        logger.error(f"Failed to sync {entity}: {entity.error}")
-        schedule_retry(entity)
-    
-    # Update sync log
-    update_sync_log({
-        'status': 'partial',
-        'successful_entities': successful_entities,
-        'failed_entities': failed_entities
-    })
-```
-
-## Testing Requirements
-
-### Data Quality Tests
-```python
-def test_balance_reconciliation():
-    """Test balance reconciliation logic"""
-    # Create test data
-    test_account = create_test_account()
-    test_positions = create_test_positions()
-    test_cash = create_test_cash()
-    
-    # Run validation
-    result = validate_balance_reconciliation(test_account['id'])
-    assert result is True
-
-def test_position_consistency():
-    """Test position consistency validation"""
-    # Test valid positions
-    valid_positions = create_valid_positions()
-    assert validate_position_consistency(valid_positions) is True
-    
-    # Test invalid positions
-    invalid_positions = create_invalid_positions()
-    with pytest.raises(ValidationError):
-        validate_position_consistency(invalid_positions)
-```
-
-## Monitoring and Alerting
-
-### Data Quality Metrics
-- Validation pass rate
-- Data completeness percentage
-- Outlier detection frequency
-- Balance reconciliation accuracy
-- Data freshness timestamps
-
-### Alerting Thresholds
-- Validation pass rate < 95%
-- Data completeness < 90%
-- Balance reconciliation error > $1.00
-- Data older than 24 hours
-- Outlier detection > 5 per day
-
-## Compliance Checklist
-
-### Implementation
-- [ ] Data validation functions implemented
-- [ ] Database constraints defined
-- [ ] Error handling covers all scenarios
-- [ ] Monitoring and alerting configured
-- [ ] Testing coverage is comprehensive
-
-### Operations
-- [ ] Data quality checks run automatically
-- [ ] Alerts are configured and tested
-- [ ] Recovery procedures are documented
-- [ ] Performance is acceptable
-- [ ] Data accuracy is verified regularly# Data Quality Rule
-
-## Purpose
-Ensure high-quality, consistent, and reliable data throughout the IBKR Client Portal Web API integration.
-
-## Scope
-- Data ingestion and normalization
-- Database operations
-- Data validation
-- Error handling and recovery
-- Data consistency checks
-
-## Data Quality Standards
-
-### Validation Rules
-- **Balance reconciliation**: Cash + positions ≈ account value (within tolerance)
-- **Position consistency**: Negative quantities only for short positions
-- **Trade validation**: Shares > 0, side in {BUY, SELL}, price > 0
-- **Date validation**: No future dates, monotonic execution times
-- **Currency validation**: Valid ISO 4217 codes, consistent formatting
-
-### Data Normalization
-```python
-# Good: Consistent data normalization
-def normalize_execution(api_data):
-    """Normalize execution data from API"""
-    return {
-        'exec_id': api_data['execId'],
-        'order_id': api_data.get('orderId'),
-        'side': api_data['side'].upper(),
-        'shares': float(api_data['shares']),
-        'price': float(api_data['price']),
-        'currency': api_data['currency'].upper(),
-        'executed_at': parse_iso_datetime(api_data['time']),
-        'ingested_at': datetime.utcnow().isoformat()
-    }
-
-# Bad: Inconsistent normalization
-def normalize_execution(api_data):
-    return api_data  # No normalization
-```
-
-### Database Constraints
-```sql
--- Good: Proper constraints
-CREATE TABLE executions (
-    id INTEGER PRIMARY KEY,
-    exec_id TEXT NOT NULL UNIQUE,
-    side TEXT NOT NULL CHECK (side IN ('BUY', 'SELL')),
-    shares REAL NOT NULL CHECK (shares > 0),
-    price REAL NOT NULL CHECK (price > 0),
-    currency TEXT NOT NULL CHECK (length(currency) = 3)
-);
-
--- Bad: No constraints
-CREATE TABLE executions (
-    id INTEGER PRIMARY KEY,
-    exec_id TEXT,
-    side TEXT,
-    shares REAL,
-    price REAL
-);
-```
-
-## Data Validation Functions
-
-### Balance Reconciliation
-```python
-def validate_balance_reconciliation(account_id, tolerance=0.01):
-    """Validate that cash + positions ≈ account value"""
-    cash_balance = get_cash_balance(account_id)
-    position_value = get_total_position_value(account_id)
-    account_value = get_account_value(account_id)
-    
-    calculated_value = cash_balance + position_value
-    difference = abs(calculated_value - account_value)
-    
-    if difference > tolerance:
-        raise ValidationError(f"Balance mismatch: {difference} > {tolerance}")
-    
-    return True
-```
-
-### Position Consistency
-```python
-def validate_position_consistency():
-    """Validate position data consistency"""
-    positions = get_all_positions()
-    
-    for position in positions:
-        if position['quantity'] < 0 and not position.get('is_short', False):
-            raise ValidationError(f"Negative position without short flag: {position['symbol']}")
-        
-        if not position['currency']:
-            raise ValidationError(f"Missing currency for position: {position['symbol']}")
-    
-    return True
-```
-
-### Trade Validation
-```python
-def validate_trade_data(execution):
-    """Validate individual trade data"""
-    if execution['shares'] <= 0:
-        raise ValidationError("Shares must be positive")
+    if execution['quantity'] <= 0:
+        raise ValidationError("Quantity must be positive")
     
     if execution['side'] not in ['BUY', 'SELL']:
         raise ValidationError("Side must be BUY or SELL")

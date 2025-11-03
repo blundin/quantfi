@@ -167,7 +167,7 @@ class TestDatabaseOperations:
         execution_data = {
             'exec_id': '12345',
             'side': 'BUY',
-            'shares': 100,
+            'quantity': 100,  # Normalized from API 'shares' field
             'price': 150.0,
             'currency': 'USD'
         }
@@ -185,7 +185,7 @@ class TestDatabaseOperations:
         execution_data = {
             'exec_id': '12345',
             'side': 'BUY',
-            'shares': 100,
+            'quantity': 100,  # Normalized from API 'shares' field
             'price': 150.0,
             'currency': 'USD'
         }
@@ -240,7 +240,7 @@ def sample_executions():
             'conid': 265598,
             'symbol': 'AAPL',
             'side': 'BUY',
-            'shares': 100,
+            'quantity': 100,  # Normalized from API 'shares' field
             'price': 150.00,
             'currency': 'USD'
         }
@@ -553,7 +553,7 @@ class TestDatabaseOperations:
         execution_data = {
             'exec_id': '12345',
             'side': 'BUY',
-            'shares': 100,
+            'quantity': 100,  # Normalized from API 'shares' field
             'price': 150.0,
             'currency': 'USD'
         }
@@ -571,7 +571,7 @@ class TestDatabaseOperations:
         execution_data = {
             'exec_id': '12345',
             'side': 'BUY',
-            'shares': 100,
+            'quantity': 100,  # Normalized from API 'shares' field
             'price': 150.0,
             'currency': 'USD'
         }
@@ -626,7 +626,7 @@ def sample_executions():
             'conid': 265598,
             'symbol': 'AAPL',
             'side': 'BUY',
-            'shares': 100,
+            'quantity': 100,  # Normalized from API 'shares' field
             'price': 150.00,
             'currency': 'USD'
         }

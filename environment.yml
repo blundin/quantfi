@@ -1,0 +1,33 @@
+name: quantfi
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - ipykernel
+  - jupyterlab
+  - pandas
+  - numpy
+  - duckdb
+  - pyarrow
+  - requests
+  - urllib3
+  - certifi
+  - click
+  - rich
+  - tqdm
+  - pytest
+  - pytest-cov
+  - requests-mock
+  - tenacity
+  - python-dotenv
+  - great-expectations
+  - plotly
+  - ipywidgets
+  - mypy
+  - black
+  - ruff  # Modern, fast linter (replaces flake8, isort, and more)
+  - alembic
+  - sqlalchemy
+  - pip
+  - pip:
+      - pysqlcipher3  # Not available on conda-forge; requires system SQLCipher

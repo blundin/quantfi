@@ -394,7 +394,7 @@ python -c "from src.api_client import test_connection; test_connection()"
 export GATEWAY_PORT=5001
 
 # Custom database location
-export DB_PATH=/custom/path/flex.db
+export DB_PATH=/custom/path/portfolio.db
 
 # Custom log level
 export LOG_LEVEL=DEBUG

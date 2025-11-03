@@ -1,0 +1,26 @@
+# Files and directories that Cursor AI should NEVER access
+# This is an additional layer beyond .gitignore
+
+# Environment files with secrets
+.env
+.env.*
+!.env.example
+
+# Sensitive data
+**/portfolio.db
+**/portfolio.db-*
+**/data/**/*.db
+**/data/**/*.db-*
+
+# Logs that may contain sensitive info
+**/logs/**
+**/*.log
+
+# Backup files that may contain encrypted data
+**/backups/**
+
+# Temporary files
+**/__pycache__/
+**/*.pyc
+**/.DS_Store
+

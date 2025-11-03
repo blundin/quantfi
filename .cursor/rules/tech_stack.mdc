@@ -1,0 +1,149 @@
+---
+alwaysApply: true
+---
+
+# Technology Stack Enforcement Rule
+
+## Purpose
+Ensure all code, documentation, and suggestions align with the approved technology stack. Prevent drift to alternative technologies without explicit approval.
+
+## Scope
+- All code files (Python, SQL, configuration)
+- Documentation files
+- Dependency specifications (environment.yml, requirements.txt)
+- Implementation suggestions
+- Tool recommendations
+
+## Approved Technology Stack
+
+### Core Technologies (Locked)
+- **Language**: Python 3.11 only
+- **Environment**: Conda/Miniconda (conda-forge channel)
+- **UI**: Jupyter Lab (primary), Flask (future Phase 6)
+- **Visualization**: Plotly only (not Matplotlib)
+
+### Storage
+- **Database**: SQLite with SQLCipher (portfolio.db)
+  - Currency: INTEGER (not BIGINT, not REAL/float)
+  - Currency scope: USD-only in Phase 1
+- **Analytics**: DuckDB for queries
+- **Research data**: Parquet files (not CSV, not HDF5)
+
+### Database Tools
+- **Migrations**: Alembic only
+- **ORM**: SQLAlchemy (optional, for Alembic)
+- **No alternatives**: No Flyway, no Liquibase
+
+### HTTP Client
+- **requests** only (not httpx, not urllib3 directly)
+
+### CLI Framework
+- **Click** only (not argparse, not typer)
+
+### Code Quality Tools
+- **Formatting**: Black only
+- **Linting**: Ruff only (NOT flake8)
+- **Type checking**: mypy
+
+### Testing
+- **pytest** only (not unittest, not nose2)
+
+### Retry Logic
+- **tenacity** only
+
+## Enforcement Rules
+
+### Code Generation
+- ✅ **MUST use**: Python 3.11, SQLite INTEGER for currency, requests, Click, pytest, Black, Ruff
+- ❌ **MUST NOT suggest**: PostgreSQL, MongoDB, Matplotlib, flake8, venv instead of conda, FastAPI instead of Flask
+- ⚠️ **Requires approval**: Any technology not in approved list
+
+### Documentation
+- ✅ Reference only approved technologies
+- ✅ Use correct names: "Jupyter Lab" not "Jupyter Notebook", "Plotly" not "matplotlib"
+- ✅ Currency: Always specify USD-only for Phase 1
+- ✅ Database: Always use "portfolio.db" not "flex.db"
+
+### Dependency Management
+- ✅ Add packages only to `environment.yml` (conda-forge)
+- ✅ Use pip section only for packages unavailable on conda-forge
+- ✅ Never suggest alternative package managers (poetry, pipenv) without approval
+
+### Database Operations
+- ✅ Always use INTEGER (not BIGINT) for currency amounts
+- ✅ Always convert to/from micro-dollars (1,000,000x) using Decimal
+- ✅ Always validate USD-only in Phase 1
+- ✅ Always use SQLite (never suggest PostgreSQL/MySQL)
+
+### Example Compliance Checks
+
+#### Good (Compliant)
+```python
+# ✅ Uses approved stack
+import requests
+from decimal import Decimal
+from click import command, option
+
+MICRO_DOLLARS = 1_000_000
+
+def currency_to_int(amount: Decimal) -> int:
+    return int(amount * MICRO_DOLLARS)
+```
+
+#### Bad (Non-Compliant)
+```python
+# ❌ Uses unapproved technology
+import httpx  # Should use requests
+import matplotlib.pyplot as plt  # Should use plotly
+from typing import TYPE_CHECKING  # Not wrong, but verify intent
+```
+
+## Exceptions
+
+### Requires Explicit Approval
+- Any new major framework/library not in approved list
+- Database alternatives (PostgreSQL, MongoDB, etc.)
+- Alternative visualization libraries (Matplotlib, Bokeh)
+- Alternative web frameworks (FastAPI, Django)
+- Alternative testing frameworks
+- Cloud services or external databases
+
+### Pre-approved for Future Phases
+- Flask (Phase 6) - web framework
+- Additional visualization tools (if needed later)
+
+## Validation Checklist
+
+Before suggesting code or making changes:
+- [ ] Uses Python 3.11 syntax/features only
+- [ ] Uses approved libraries (requests, Click, pytest, etc.)
+- [ ] Currency handling uses INTEGER + micro-dollars
+- [ ] Database operations use SQLite (not other databases)
+- [ ] No references to unapproved alternatives
+- [ ] Documentation matches approved terminology
+
+## Error Prevention
+
+### Common Mistakes to Avoid
+- ❌ Suggesting flake8 instead of Ruff
+- ❌ Suggesting Matplotlib instead of Plotly
+- ❌ Suggesting PostgreSQL for local app
+- ❌ Using REAL/float for currency amounts
+- ❌ Suggesting venv instead of conda
+- ❌ Adding packages not in approved stack without approval
+
+## Compliance
+
+If suggesting a technology not in the approved stack:
+1. **First**: Check if alternative is in approved list
+2. **If not**: Request explicit user approval before using
+3. **Document**: Update `docs/tech_stack.md` if approved
+
+## Testing
+
+All code must:
+- Run with Python 3.11
+- Use approved testing framework (pytest)
+- Pass Black formatting
+- Pass Ruff linting
+- Not import unapproved libraries

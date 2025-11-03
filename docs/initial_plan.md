@@ -11,6 +11,7 @@
 * Optional ingest of market data snapshots and third‑party research datasets
 * Storage in SQLite for durable tracking and DuckDB + Parquet for analytics
 * Lightweight Flask app for read‑only dashboards and JSON APIs
+* **Currency**: USD-only in Phase 1; all positions and transactions are USD-denominated (US equities, ETFs, ADRs trade in USD)
 
 ## Non‑Goals
 
@@ -200,3 +201,14 @@
 * **CLI + Notebook**: CLI for automation and batch jobs; notebooks for interactive control and monitoring
 * **macOS Native**: Backup automation uses `launchd` and native macOS tools (`ditto`, `hdiutil`)
 * **Testing Strategy**: pytest for all code with appropriate data validation tools (pandas-profiling, great-expectations)
+
+## References
+
+* Pre-Implementation Checklist: `docs/pre_implementation_checklist.md`
+* Tech stack: `docs/tech_stack.md`
+* Phase 1 Implementation Checklist: `docs/implementation_checklist.md`
+* Error Handling & Retry Strategies: `docs/error_handling_retry.md`
+* Security Measures: `docs/security_measures.md`
+* Testing Plan: `docs/testing_plan.md`
+* Deployment Runbook: `docs/deployment_runbook.md`
+* User Guide: `docs/user_guide.md`

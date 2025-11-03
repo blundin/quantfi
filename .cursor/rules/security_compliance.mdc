@@ -7,132 +7,7 @@ alwaysApply: true
 ## Purpose
 Ensure the IBKR Client Portal Web API integration adheres to security standards and best practices for financial data handling.
 
-## Scope
-- All code files
-- Configuration files
-- Database operations
-- API interactions
-- Logging and monitoring
-
-## Security Standards
-
-### Data Protection
-- **Encryption at rest**: All sensitive data must be encrypted using SQLCipher
-- **No credential storage**: Never store IBKR credentials in code or config files
-- **Session security**: Treat session cookies as secrets, never log full values
-- **Data redaction**: Redact account IDs and sensitive data in logs
-
-### Network Security
-- **Localhost only**: All API calls must be to localhost:5000
-- **TLS handling**: Properly handle self-signed certificates for local gateway
-- **No external exposure**: Never expose sensitive endpoints externally
-
-### Access Controls
-- **Read-only API**: Only use read-only endpoints, no trading capabilities
-- **Single user**: Design for single-user, single-account operation
-- **File permissions**: Restrict database and log file access to application user only
-
-### Logging Security
-- **Structured logging**: Use JSON format with consistent fields
-- **Sensitive data**: Never log full API responses or credentials
-- **Audit trail**: Log all API access and data operations
-- **Log rotation**: Implement proper log rotation to prevent disk issues
-
-## Code Requirements
-
-### Database Security
-```python
-# Good: Encrypted database connection
-from sqlcipher3 import dbapi2 as sqlite3
-conn = sqlite3.connect('data/portfolio.db')
-conn.execute("PRAGMA key = 'encryption_key'")
-
-# Bad: Unencrypted database
-import sqlite3
-conn = sqlite3.connect('data/portfolio.db')
-```
-
-### API Security
-```python
-# Good: Redacted logging
-logger.info("API call completed", extra={
-    "account_id": account_id[:3] + "****",
-    "endpoint": "/portfolio/positions"
-})
-
-# Bad: Full data logging
-logger.info(f"API response: {full_response}")
-```
-
-### Configuration Security
-```python
-# Good: Environment variables
-import os
-db_key = os.getenv('DB_ENCRYPTION_KEY')
-
-# Bad: Hardcoded secrets
-db_key = "my_secret_key_123"
-```
-
-## Validation Rules
-
-### Pre-commit Checks
-- [ ] No hardcoded credentials or API keys
-- [ ] All database connections use encryption
-- [ ] Logging redacts sensitive information
-- [ ] No external network calls (localhost only)
-- [ ] File permissions are restrictive
-
-### Code Review Requirements
-- [ ] Security implications reviewed
-- [ ] Data handling follows encryption standards
-- [ ] Error messages don't leak sensitive information
-- [ ] API calls are read-only only
-- [ ] Logging is appropriately redacted
-
-## Incident Response
-
-### Security Violations
-1. **Immediate**: Stop all services
-2. **Investigate**: Review logs for data exposure
-3. **Contain**: Isolate affected systems
-4. **Document**: Record incident details
-5. **Remediate**: Fix security issues
-6. **Prevent**: Update security measures
-
-### Data Breach Response
-1. **Assess**: Determine scope of exposure
-2. **Notify**: Alert relevant parties
-3. **Contain**: Stop further data access
-4. **Investigate**: Root cause analysis
-5. **Remediate**: Fix vulnerabilities
-6. **Monitor**: Enhanced security monitoring
-
-## Compliance Checklist
-
-### Initial Setup
-- [ ] Database encryption enabled
-- [ ] No credentials in version control
-- [ ] File permissions configured
-- [ ] Logging security implemented
-- [ ] Network access restricted
-
-### Ongoing Security
-- [ ] Regular security reviews
-- [ ] Dependency updates
-- [ ] Log monitoring
-- [ ] Access pattern analysis
-- [ ] Backup security verification
-
-### Before Deployment
-- [ ] Security code review completed
-- [ ] Penetration testing performed
-- [ ] Backup encryption verified
-- [ ] Incident response plan ready
-- [ ] Security documentation updated# Security Compliance Rule
-
-## Purpose
-Ensure the IBKR Client Portal Web API integration adheres to security standards and best practices for financial data handling.
+**CRITICAL**: See `.cursor/rules/env_security.mdc` for strict rules prohibiting access to `.env` files and secrets.
 
 ## Scope
 - All code files
@@ -170,13 +45,38 @@ Ensure the IBKR Client Portal Web API integration adheres to security standards 
 ### Database Security
 ```python
 # Good: Encrypted database connection
-from sqlcipher3 import dbapi2 as sqlite3
+from pysqlcipher3 import dbapi2 as sqlite3
 conn = sqlite3.connect('data/portfolio.db')
 conn.execute("PRAGMA key = 'encryption_key'")
 
 # Bad: Unencrypted database
 import sqlite3
 conn = sqlite3.connect('data/portfolio.db')
+```
+
+### SQL Injection Prevention
+- **Never use string interpolation in SQL**: Always use parameterized queries
+- **Sanitize all user inputs**: Validate and sanitize before database operations
+- **PRAGMA statements**: Even PRAGMA commands with user input must be sanitized
+- **Validation**: Validate input format, length, and content before database operations
+
+```python
+# Good: Parameterized query (for user data)
+cursor.execute("SELECT * FROM accounts WHERE id = ?", (account_id,))
+
+# Good: Sanitized PRAGMA (for encryption key)
+sanitized_key = encryption_key.replace("'", "''")  # Escape single quotes
+conn.execute(f"PRAGMA key = '{sanitized_key}'")
+
+# Better: Validate encryption key format before use
+if not re.match(r"^[a-zA-Z0-9_-]+$", encryption_key):
+    raise ValueError("Invalid encryption key format")
+
+# Bad: String interpolation with user input
+conn.execute(f"PRAGMA key = '{encryption_key}'")  # SQL injection risk
+
+# Bad: Direct string concatenation
+cursor.execute("SELECT * FROM accounts WHERE id = '" + account_id + "'")
 ```
 
 ### API Security
@@ -209,6 +109,9 @@ db_key = "my_secret_key_123"
 - [ ] Logging redacts sensitive information
 - [ ] No external network calls (localhost only)
 - [ ] File permissions are restrictive
+- [ ] All SQL uses parameterized queries (no string interpolation)
+- [ ] All user inputs are validated and sanitized
+- [ ] PRAGMA statements with user input are sanitized
 
 ### Code Review Requirements
 - [ ] Security implications reviewed
@@ -216,6 +119,9 @@ db_key = "my_secret_key_123"
 - [ ] Error messages don't leak sensitive information
 - [ ] API calls are read-only only
 - [ ] Logging is appropriately redacted
+- [ ] No SQL injection vulnerabilities (parameterized queries)
+- [ ] Input validation and sanitization implemented
+- [ ] Error handling logs failures without exposing sensitive data
 
 ## Incident Response
 

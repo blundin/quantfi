@@ -1,6 +1,7 @@
 # Phase 1 Implementation Checklist (Web API, macOS-local)
 
 This checklist guides the initial build. Keep everything local to macOS and the Client Portal Gateway. Reference:
+- Tech stack: `docs/tech_stack.md`
 - Web API overview: `docs/ib_web_api.md`
 - Auth/session: `docs/ib_web_api_auth.md`
 - Endpoints catalog: `docs/ib_web_api_endpoints.md`
@@ -38,6 +39,8 @@ This checklist guides the initial build. Keep everything local to macOS and the 
 ## 5) Normalization Layer
 - Map responses → pandas DataFrames with explicit dtypes
 - Add validators for required fields and enums
+- **Currency validation**: Validate all currency codes are "USD" (Phase 1 requirement)
+- Convert amounts using USD-only micro-dollar conversion functions
 - Emit tidy CSVs under `data/processed/` (optional)
 
 ## 6) SQLite Schema & Migrations
@@ -57,6 +60,7 @@ This checklist guides the initial build. Keep everything local to macOS and the 
 
 ## 9) Data Quality Validation
 - Balance reconciliation, position consistency, trades sanity, dates sanity, outlier flags
+- **Currency validation**: Ensure all currency codes are "USD" (Phase 1 requirement)
 - `python -m src.cli validate` command to run checks
 
 ## 10) CLI Commands (docs only now)

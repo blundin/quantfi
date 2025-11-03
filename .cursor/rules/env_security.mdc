@@ -1,0 +1,134 @@
+---
+alwaysApply: true
+---
+
+# Environment File Security Rule
+
+## Purpose
+Ensure that `.env` files and their contents are NEVER accessed, read, or used by the AI agent. Secrets must remain private and local-only.
+
+## Scope
+- All `.env`, `.env.*` files (except `.env.example`)
+- All environment variables containing secrets
+- Database encryption keys
+- API credentials
+- Any sensitive configuration values
+
+## CRITICAL RULES
+
+### NEVER Do These Things
+- ❌ **NEVER** read `.env` files using `read_file` or any tool
+- ❌ **NEVER** access environment variables that may contain secrets
+- ❌ **NEVER** use values from `.env` files in code examples or responses
+- ❌ **NEVER** search for or grep `.env` files
+- ❌ **NEVER** copy or paste `.env` contents
+- ❌ **NEVER** send secret values off the machine in any form
+- ❌ **NEVER** log or include secret values in code snippets
+- ❌ **NEVER** attempt to validate or verify `.env` contents directly
+
+### ALWAYS Do These Things
+- ✅ **ONLY** reference `.env.example` (template files are safe)
+- ✅ **ONLY** provide instructions for the USER to manually update `.env`
+- ✅ **ONLY** show template/example values (never real secrets)
+- ✅ **ONLY** instruct the user on how to set environment variables
+- ✅ Use placeholders like `your-secure-key-here`, `U1234567`, `change-me`
+- ✅ Provide clear instructions: "You must manually add X to your .env file"
+
+## Examples
+
+### ✅ CORRECT: Provide Instructions Only
+```markdown
+**Action Required**: You must manually create/update your `.env` file:
+
+1. Copy `.env.example` to `.env`
+2. Update `DB_ENCRYPTION_KEY` with your secure key (minimum 32 characters)
+3. Set `IBKR_ACCOUNT_ID` to your actual account ID
+4. Never commit `.env` to version control
+```
+
+### ✅ CORRECT: Show Template Only
+```python
+# Example configuration (user must update .env manually)
+# DB_ENCRETION_KEY=your-secure-key-min-32-chars-here
+# IBKR_ACCOUNT_ID=U1234567
+```
+
+### ❌ WRONG: Reading or Using Real Values
+```python
+# NEVER do this:
+db_key = os.getenv('DB_ENCRETION_KEY')  # Don't even reference reading it
+# NEVER read .env files directly
+# NEVER show real values even if seen
+```
+
+### ❌ WRONG: Accessing .env Files
+```bash
+# NEVER use these commands:
+cat .env
+grep "DB_ENCRETION_KEY" .env
+read_file('.env')
+```
+
+## When User Asks About .env
+
+### User: "What should be in my .env file?"
+**Response**: "Reference the `.env.example` template. I can show you the structure, but you must manually fill in your actual secrets."
+
+### User: "Help me set up my .env"
+**Response**: Provide step-by-step instructions without accessing the file:
+1. Copy template: `cp .env.example .env`
+2. Edit manually with your text editor
+3. Set each variable with your actual values
+4. Verify it's in `.gitignore`
+
+### User: "What's in my .env file?"
+**Response**: "I cannot access `.env` files for security reasons. You can view it locally with: `cat .env` (in your terminal, not through me)."
+
+## Code Examples with Secrets
+
+### ✅ CORRECT: Template/Example Only
+```python
+# Configuration loading (user's .env file contains real values)
+from dotenv import load_dotenv
+import os
+
+load_dotenv()  # Loads from .env file (which I cannot see)
+
+# These will get real values from user's .env, but I never see them
+db_path = os.getenv('DB_PATH', 'data/portfolio.db')
+# db_key = os.getenv('DB_ENCRETION_KEY')  # User's secret, I never access
+```
+
+### ❌ WRONG: Hardcoding or Showing Secrets
+```python
+# NEVER do this:
+DB_ENCRETION_KEY = "actual-secret-key"  # NEVER hardcode
+db_key = "real-value-i-saw"  # NEVER use real values
+```
+
+## Validation
+
+If asked to validate `.env` configuration:
+- ✅ Check that `.env.example` template is correct
+- ✅ Verify `.env` is in `.gitignore`
+- ❌ NEVER read actual `.env` file to validate
+- ✅ Provide instructions for user to manually verify
+
+## Emergency Response
+
+If accidentally exposed to `.env` content:
+1. Immediately stop using any values seen
+2. Inform user they should rotate secrets
+3. Never repeat or reference the values
+4. Only provide instructions going forward
+
+## Compliance
+
+This rule is **ALWAYS APPLIED** - no exceptions for convenience, debugging, or "just this once". Security overrides all other concerns.
+
+## Enforcement
+
+- All file operations must exclude `.env*` patterns (except `.env.example`)
+- All code examples must use placeholders only
+- All instructions must require manual user action
+- Never assume or use values that could be from `.env`

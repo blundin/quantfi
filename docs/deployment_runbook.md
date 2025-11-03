@@ -7,7 +7,7 @@ Purpose: Operational procedures for deploying and maintaining the IBKR Client Po
 - **Environment**: macOS localhost-only deployment
 - **Components**: Client Portal Gateway, Python application, SQLite database
 - **Access**: Single user, local machine only
-- **Dependencies**: Java 8u192+, Python 3.11+
+- **Dependencies**: Java 11+, Python 3.11+
 
 ## Prerequisites
 
@@ -416,7 +416,7 @@ pkill -f "python.*quantfi"
 cp data/portfolio.db data/portfolio.db.backup
 
 # Restore from backup
-cp ~/Library/Application\ Support/QuantFi/backups/YYYYMMDD/flex.db data/
+cp ~/Library/Application\ Support/QuantFi/backups/YYYYMMDD/portfolio.db data/
 
 # Verify integrity
 sqlite3 data/portfolio.db "PRAGMA integrity_check;"

@@ -26,7 +26,7 @@ Purpose: Define security posture for the local-only IBKR Client Portal Web API i
 ## Data Protection
 
 ### Encryption at Rest
-- **Database encryption**: SQLCipher with strong encryption for `flex.db`
+- **Database encryption**: SQLCipher with strong encryption for `portfolio.db`
 - **Backup encryption**: macOS-native encryption for backup archives
 - **Key management**: Use OS keychain for encryption keys where possible
 - **No plaintext storage**: All sensitive data encrypted before storage
