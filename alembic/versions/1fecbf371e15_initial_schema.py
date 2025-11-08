@@ -73,6 +73,8 @@ def upgrade() -> None:
         sa.Column("unrealized_pnl", sa.Integer(), nullable=True),
         sa.Column("realized_pnl", sa.Integer(), nullable=True),
         sa.Column("snapshot_ts", sa.Text(), nullable=False),
+        sa.Column("created_at", sa.Text(), nullable=False),
+        sa.Column("updated_at", sa.Text(), nullable=False),
         sa.ForeignKeyConstraint(["account_id"], ["accounts.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["symbol_id"], ["symbols.id"], ondelete="RESTRICT"),
         sa.CheckConstraint("currency = 'USD'", name="check_positions_currency_usd"),

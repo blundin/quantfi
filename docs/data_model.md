@@ -26,7 +26,7 @@ References:
 ## Table: accounts
 
 - `id` TEXT PRIMARY KEY  — IB Account ID (e.g., "U1234567")
-- `title` TEXT NOT NULL  — Display name/title
+- `name` TEXT NOT NULL  — Display name
 - `base_currency` TEXT NOT NULL  — ISO 4217 currency code (must be "USD" for Phase 1)
 - `created_at` TEXT NOT NULL  — ISO-8601 insert time
 - `updated_at` TEXT NOT NULL  — ISO-8601 last update time
