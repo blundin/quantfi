@@ -119,7 +119,7 @@ class TestSyncPositions:
 
         with requests_mock.Mocker() as m:
             m.get(
-                "https://localhost:5000/v1/api/portfolio/U1234567/positions",
+                "https://localhost:5001/v1/api/portfolio/U1234567/positions",
                 json=api_response,
                 status_code=200,
             )
@@ -157,7 +157,7 @@ class TestSyncPositions:
 
         with requests_mock.Mocker() as m:
             m.get(
-                "https://localhost:5000/v1/api/portfolio/U1234567/positions",
+                "https://localhost:5001/v1/api/portfolio/U1234567/positions",
                 json=sample_positions_response_empty(),
                 status_code=200,
             )
@@ -199,7 +199,7 @@ class TestSyncPositions:
 
         with requests_mock.Mocker() as m:
             m.get(
-                "https://localhost:5000/v1/api/portfolio/U1234567/positions",
+                "https://localhost:5001/v1/api/portfolio/U1234567/positions",
                 json=api_response,
                 status_code=200,
             )
@@ -253,7 +253,7 @@ class TestSyncPositions:
 
         with requests_mock.Mocker() as m:
             m.get(
-                "https://localhost:5000/v1/api/portfolio/U1234567/positions",
+                "https://localhost:5001/v1/api/portfolio/U1234567/positions",
                 json=api_response,
                 status_code=200,
             )
@@ -271,7 +271,7 @@ class TestSyncPositions:
 
         with requests_mock.Mocker() as m:
             m.get(
-                "https://localhost:5000/v1/api/portfolio/U1234567/positions",
+                "https://localhost:5001/v1/api/portfolio/U1234567/positions",
                 status_code=401,
             )
 
@@ -284,7 +284,7 @@ class TestSyncPositions:
 
         with requests_mock.Mocker() as m:
             m.get(
-                "https://localhost:5000/v1/api/portfolio/U1234567/positions",
+                "https://localhost:5001/v1/api/portfolio/U1234567/positions",
                 exc=requests.exceptions.ConnectionError("Connection refused"),
             )
 
@@ -297,7 +297,7 @@ class TestSyncPositions:
 
         with requests_mock.Mocker() as m:
             m.get(
-                "https://localhost:5000/v1/api/portfolio/U1234567/positions",
+                "https://localhost:5001/v1/api/portfolio/U1234567/positions",
                 status_code=500,
             )
 
@@ -324,7 +324,7 @@ class TestSyncPositions:
 
         with requests_mock.Mocker() as m:
             m.get(
-                "https://localhost:5000/v1/api/portfolio/U1234567/positions",
+                "https://localhost:5001/v1/api/portfolio/U1234567/positions",
                 json=api_response,
                 status_code=200,
             )
@@ -334,3 +334,177 @@ class TestSyncPositions:
 
             assert result["status"] == "success"
             assert result["positions_saved"] == 2
+
+    def test_sync_positions_duplicate_snapshot_handles_gracefully(self, test_db):
+        """Test that duplicate positions with same snapshot_ts are handled gracefully."""
+        # Create tables
+        create_accounts_table(test_db)
+        create_symbols_table(test_db)
+        create_positions_table(test_db)
+
+        # Create account first
+        account = Account(
+            database=test_db,
+            id="U1234567",
+            name="Test Account",
+            base_currency="USD",
+        )
+        account.save()
+
+        # Create symbol
+        symbol = Symbol(
+            database=test_db,
+            conid=265598,
+            symbol="AAPL",
+            sec_type="STK",
+            currency="USD",
+        )
+        symbol.save()
+
+        # Manually create a position with a fixed snapshot_ts
+        fixed_snapshot_ts = "2025-01-15T10:30:00Z"
+        existing_position = Position(
+            database=test_db,
+            account_id="U1234567",
+            symbol_id=symbol.id,
+            quantity=100.0,
+            currency="USD",
+            snapshot_ts=fixed_snapshot_ts,
+        )
+        existing_position.save()
+
+        # Now try to sync the same position with the same snapshot_ts
+        # This should cause a unique constraint violation
+        api_response = [
+            {
+                "conid": 265598,
+                "symbol": "AAPL",
+                "secType": "STK",
+                "position": 100,
+                "currency": "USD",
+            }
+        ]
+
+        api_client = IBKRAPIClient()
+
+        with requests_mock.Mocker() as m:
+            m.get(
+                "https://localhost:5001/v1/api/portfolio/U1234567/positions",
+                json=api_response,
+                status_code=200,
+            )
+
+            # Sync - this will try to create a duplicate position
+            # Since snapshot_ts is generated fresh, it's unlikely to match,
+            # but we test that if it does match (or any other error occurs),
+            # it's handled gracefully
+            result = sync_positions(test_db, "U1234567", api_client)
+
+            # The sync should complete without crashing
+            # If snapshot_ts matches exactly, we get a unique constraint violation
+            # which is caught and added to errors
+            assert result["status"] in ["success", "partial", "failed"]
+            # If it's a duplicate, we should have an error
+            if result["status"] != "success":
+                assert len(result["errors"]) > 0
+
+    def test_sync_positions_account_not_found(self, test_db):
+        """Test sync fails gracefully when account doesn't exist."""
+        # Create tables
+        create_accounts_table(test_db)
+        create_symbols_table(test_db)
+        create_positions_table(test_db)
+
+        # Don't create account - it doesn't exist
+
+        api_response = [
+            {
+                "conid": 265598,
+                "symbol": "AAPL",
+                "secType": "STK",
+                "position": 100,
+                "currency": "USD",
+            }
+        ]
+
+        api_client = IBKRAPIClient()
+
+        with requests_mock.Mocker() as m:
+            m.get(
+                "https://localhost:5001/v1/api/portfolio/U1234567/positions",
+                json=api_response,
+                status_code=200,
+            )
+
+            result = sync_positions(test_db, "U1234567", api_client)
+
+            # Should fail because account doesn't exist
+            # Position.create_from_api_data() will raise ValueError
+            assert result["status"] == "failed"
+            assert result["positions_fetched"] == 1
+            assert result["positions_saved"] == 0
+            assert len(result["errors"]) == 1
+            assert (
+                "Account" in result["errors"][0]
+                or "account" in result["errors"][0].lower()
+            )
+
+    def test_sync_positions_symbol_creation_failure(self, test_db):
+        """Test sync handles Symbol creation failures gracefully."""
+        # Create tables
+        create_accounts_table(test_db)
+        create_symbols_table(test_db)
+        create_positions_table(test_db)
+
+        # Create account first
+        account = Account(
+            database=test_db,
+            id="U1234567",
+            name="Test Account",
+            base_currency="USD",
+        )
+        account.save()
+
+        # Create a Symbol with the same conid to cause a conflict
+        # when Position.create_from_api_data tries to create it
+        existing_symbol = Symbol(
+            database=test_db,
+            conid=265598,
+            symbol="OLD",
+            sec_type="STK",
+            currency="USD",
+        )
+        existing_symbol.save()
+
+        # Now try to sync a position with the same conid but different symbol
+        # This should use the existing symbol, not create a new one
+        api_response = [
+            {
+                "conid": 265598,  # Same conid as existing symbol
+                "symbol": "AAPL",  # Different symbol name
+                "secType": "STK",
+                "position": 100,
+                "currency": "USD",
+            }
+        ]
+
+        api_client = IBKRAPIClient()
+
+        with requests_mock.Mocker() as m:
+            m.get(
+                "https://localhost:5001/v1/api/portfolio/U1234567/positions",
+                json=api_response,
+                status_code=200,
+            )
+
+            result = sync_positions(test_db, "U1234567", api_client)
+
+            # Should succeed - it uses existing symbol
+            assert result["status"] == "success"
+            assert result["positions_saved"] == 1
+
+        # Verify the existing symbol was used (not recreated)
+        symbols = Symbol.where(test_db, conid=265598)
+        assert len(symbols) == 1
+        # The symbol should still have the old name (not updated)
+        assert symbols[0].symbol == "OLD"

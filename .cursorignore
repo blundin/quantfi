@@ -24,3 +24,6 @@
 **/*.pyc
 **/.DS_Store
 
+*.der
+*.pem
+certs/

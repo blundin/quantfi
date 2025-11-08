@@ -6,6 +6,7 @@ Commands:
     validate                        Run data validation checks
 """
 
+import logging
 import os
 
 import click
@@ -16,6 +17,7 @@ from dotenv import load_dotenv
 from src.api_client import (
     APIError,
     AuthenticationError,
+    ClientError,
     IBKRAPIClient,
     NetworkError,
 )
@@ -24,6 +26,14 @@ from src.sync import sync_positions
 
 # Load environment variables
 load_dotenv()
+
+# Configure logging for CLI
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%H:%M:%S",
+)
+# Note: urllib3 SSL warnings are suppressed in src.api_client module
 
 
 def ensure_database_initialized(db_path: str) -> None:
@@ -110,17 +120,64 @@ def sync(account_id: str | None):
         # Initialize API client
         api_client = IBKRAPIClient()
 
-        # Check session with tickle
+        # Quick connection check (no retries for fast failure)
         click.echo("Checking gateway connection...")
         try:
-            api_client.tickle()
+            api_client.check_connection()
             click.echo("✓ Gateway connected and session active")
-        except (AuthenticationError, NetworkError) as e:
+        except NetworkError as e:
+            # Network errors (timeout, connection refused, etc.)
+            click.echo(f"✗ Gateway connection failed: {str(e)}", err=True)
+            click.echo(
+                "\nTroubleshooting:",
+                err=True,
+            )
+            click.echo(
+                "  1. Ensure gateway is running: ./bin/run.sh root/conf.yaml",
+                err=True,
+            )
+            click.echo(
+                "  2. Authenticate in browser FIRST: https://localhost:5001/",
+                err=True,
+            )
+            click.echo(
+                "     (The gateway requires browser authentication before API calls work)",
+                err=True,
+            )
+            click.echo(
+                "  3. After authenticating, test manually:",
+                err=True,
+            )
+            click.echo(
+                "     curl -k https://localhost:5001/v1/api/tickle",
+                err=True,
+            )
+            return
+        except (AuthenticationError, ClientError) as e:
+            # Auth/client errors (401, 403, 404, etc.)
             click.echo(f"✗ Gateway error: {str(e)}", err=True)
+            click.echo(
+                "\nTroubleshooting:",
+                err=True,
+            )
+            click.echo(
+                "  1. Re-authenticate in browser: https://localhost:5001/",
+                err=True,
+            )
+            click.echo(
+                "  2. Session may have expired (sessions expire daily or after inactivity)",
+                err=True,
+            )
+            click.echo(
+                "  3. After re-authenticating, retry this command",
+                err=True,
+            )
             return
 
         # Sync positions
         click.echo(f"Syncing positions for account {account_id}...")
+        logger = logging.getLogger(__name__)
+        logger.info(f"Starting sync for account {account_id}")
         result = sync_positions(database, account_id, api_client)
 
         # Display results
@@ -143,7 +200,7 @@ def sync(account_id: str | None):
                 for error in result["errors"]:
                     click.echo(f"  - {error}", err=True)
 
-    except (AuthenticationError, NetworkError, APIError) as e:
+    except (AuthenticationError, NetworkError, ClientError, APIError) as e:
         click.echo(f"✗ Error: {str(e)}", err=True)
         return
     except Exception as e:

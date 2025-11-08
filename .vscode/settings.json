@@ -10,6 +10,14 @@
   "ruff.enable": true,
   "ruff.organizeImports": true,
   "python.analysis.extraPaths": [],
-  "python.autoComplete.extraPaths": []
+  "python.autoComplete.extraPaths": [],
+  "sqltools.connections": [
+    {
+      "previewLimit": 50,
+      "driver": "SQLite",
+      "database": "./data/portfolio.db",
+      "name": "Portfolio"
+    }
+  ]
 }
 

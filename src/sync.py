@@ -4,7 +4,13 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from src.api_client import APIError, AuthenticationError, IBKRAPIClient, NetworkError
+from src.api_client import (
+    APIError,
+    AuthenticationError,
+    ClientError,
+    IBKRAPIClient,
+    NetworkError,
+)
 from src.data_normalization import normalize_positions
 from src.database import Database
 from src.models.position import Position
@@ -39,7 +45,8 @@ def sync_positions(
     Raises:
         AuthenticationError: If session expired
         NetworkError: If gateway not reachable
-        APIError: For other API errors
+        ClientError: If client error (400, 404, etc.)
+        APIError: For retryable API errors (429, 5xx)
     """
     if api_client is None:
         api_client = IBKRAPIClient()
@@ -51,7 +58,9 @@ def sync_positions(
     try:
         # Fetch positions from API
         logger.info(f"Fetching positions for account {account_id[:3]}****")
+        logger.info(f"Calling API: GET /portfolio/{account_id}/positions")
         api_response = api_client.get_positions(account_id)
+        logger.info(f"Received {len(api_response) if api_response else 0} positions from API")
 
         if not api_response:
             logger.info("No positions returned from API")
@@ -71,7 +80,8 @@ def sync_positions(
 
         # Save each position (auto-creates Symbols if needed)
         logger.info(f"Saving {len(normalized_positions)} positions to database")
-        for pos_data in normalized_positions:
+        for idx, pos_data in enumerate(normalized_positions, 1):
+            logger.debug(f"Processing position {idx}/{len(normalized_positions)}: {pos_data.get('symbol', 'unknown')}")
             try:
                 Position.create_from_api_data(
                     database=database,
@@ -98,6 +108,7 @@ def sync_positions(
                     multiplier=pos_data.get("multiplier"),
                 )
                 positions_saved += 1
+                logger.debug(f"Successfully saved position: {pos_data.get('symbol', 'unknown')}")
             except Exception as e:
                 error_msg = (
                     f"Failed to save position for {pos_data.get('symbol', 'unknown')}: "
@@ -125,10 +136,9 @@ def sync_positions(
             "snapshot_ts": snapshot_ts,
         }
 
-    except (AuthenticationError, NetworkError, APIError) as e:
-        logger.error(f"Sync failed: {str(e)}")
+    except (AuthenticationError, NetworkError, ClientError, APIError) as e:
+        logger.error(f"Sync failed with {type(e).__name__}: {str(e)}")
         raise
     except Exception as e:
         logger.error(f"Unexpected error during sync: {str(e)}", exc_info=True)
         raise
-

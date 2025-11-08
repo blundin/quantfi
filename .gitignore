@@ -37,3 +37,7 @@ backups/
 # Temporary files
 *.tmp
 *.temp
+
+*.der
+*.pem
+certs/
