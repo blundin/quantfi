@@ -41,3 +41,6 @@ backups/
 *.der
 *.pem
 certs/
+
+# IBKR Client Portal Gateway (third-party software - download separately)
+ib_portal/
